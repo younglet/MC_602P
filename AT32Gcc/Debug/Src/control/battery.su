@@ -1,0 +1,11 @@
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\battery.c:129:13:BattCheck_1ms_CallBack	16	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\battery.c:51:5:getBatt_AVG	0	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\battery.c:58:5:getBatt_type	16	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\battery.c:70:5:SetBatt_type	24	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\battery.c:84:5:IsBattError	16	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\battery.c:103:5:getBatt	0	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\battery.c:109:5:getBattPercentage	0	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\battery.c:184:6:SetAutoPowerDisable	0	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\battery.c:193:5:SetAutoPowerOff	8	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\battery.c:218:5:getAutoPowerOff	8	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\battery.c:246:6:InitBatt	16	static

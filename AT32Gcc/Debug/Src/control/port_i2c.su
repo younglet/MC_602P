@@ -1,0 +1,14 @@
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\port_i2c.c:118:13:i2c_port_config	24	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\port_i2c.c:80:13:i2c_sda_direction_config.constprop	16	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\port_i2c.c:80:13:i2c_sda_direction_config.constprop	16	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\port_i2c.c:366:17:i2c_trans_stop.isra	32	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\port_i2c.c:381:18:i2c_read_byte	56	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\port_i2c.c:337:17:i2c_check_ack	40	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\port_i2c.c:407:18:i2c_send_ack	32	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\port_i2c.c:310:17:i2c_write_byte	56	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\port_i2c.c:291:17:i2c_trans_start.isra	48	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\port_i2c.c:22:6:I2C_InitX	48	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\port_i2c.c:73:6:SetI2C_Clock	0	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\port_i2c.c:435:10:i2c_read	32	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\port_i2c.c:533:10:i2c_read_debug	56	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\port_i2c.c:641:10:i2c_write	32	static

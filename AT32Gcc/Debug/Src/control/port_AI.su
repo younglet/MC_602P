@@ -1,0 +1,7 @@
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\port_AI.c:158:13:AI_AVG_1MS_Call	40	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\port_AI.c:45:5:getAI	4	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\port_AI.c:119:5:getAI_Hardware	0	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\port_AI.c:127:5:getAICount	0	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\port_AI.c:195:5:getAI_Avg	8	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\port_AI.c:200:5:getAI_Max	0	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\port_AI.c:208:6:InitADC	96	static

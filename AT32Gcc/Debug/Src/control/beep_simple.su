@@ -1,0 +1,4 @@
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\beep_simple.c:80:6:beep_callback	0	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\beep_simple.c:39:6:beep	24	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\beep_simple.c:65:6:TIM1_BRK_IRQHandler	8	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\beep_simple.c:94:6:InitBeepSimple	56	static

@@ -1,0 +1,11 @@
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\power_key.c:12:6:InitPowerCtrl	16	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\power_key.c:26:6:PowerCtrl_On	0	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\power_key.c:32:6:PowerCtrl_Off	0	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\power_key.c:39:6:PowerOffSytem	8	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\power_key.c:51:6:InitKeys	16	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\power_key.c:97:5:getKey	8	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\power_key.c:154:6:wait_keyup	16	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\power_key.c:164:6:wait_keydown	24	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\power_key.c:174:6:wait_keyclick	24	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\power_key.c:184:6:enterkey_exitprogram	0	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\power_key.c:192:6:PowerOffCheck_100ms_CallBack	8	static

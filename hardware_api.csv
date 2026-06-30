@@ -1,0 +1,337 @@
+Module,Header,Category,Function,Return,Parameters,Description
+motor,port_motor.h,DC Motor,set_motor,void,"(int Port, int Speed)",设置指定端口电机速度(Speed: -100~100)
+motor,port_motor.h,DC Motor,set_motor_open,void,"(int Port, int Speed)",开环模式设置电机速度(无编码器反馈)
+motor,port_motor.h,DC Motor,set_motor_free,void,(int Port),释放电机(自由转动)
+motor,port_motor.h,DC Motor,off_motor,void,(int Port),关闭指定端口电机
+motor,port_motor.h,DC Motor,set_motor_time,void,"(int Port, int Speed, float Time)",电机定时运行
+motor,port_motor.h,DC Motor,set_motor_angle,void,"(int Port, int Speed, int Angle)",电机角度闭环控制
+motor,port_motor.h,DC Motor,set_motor_ad,void,"(int Channels, int Distance, int V1, int V2, int V3, int V4)",4路电机同步距离控制
+motor,port_motor.h,DC Motor,set_dual_motor_time,void,"(int P1, int V1, int P2, int V2, float T)",双电机定时运行
+motor,port_motor.h,DC Motor,set_dual_motor_angle,void,"(int P1, int V1, int P2, int V2, int A)",双电机角度联动
+motor,port_motor.h,DC Motor,reverse_motor,void,(int Port),反转电机方向
+motor,port_motor.h,DC Motor,motor_encoder,int,(int Port),获取电机编码器值
+motor,port_motor.h,DC Motor,reset_motor_encoder,void,(int Port),复位电机编码器
+motor,port_motor.h,DC Motor,getEncoder_Pos,int,(int Port),获取电机编码器位置
+motor,port_motor.h,DC Motor,getEncoder_Speed,int,(int Port),获取电机编码器速度
+motor,port_motor.h,DC Motor,getMotorCount,int,(void),获取已连接电机数量
+motor,port_motor.h,DC Motor,InitMotor,void,(int Hardware),初始化电机驱动
+motor,port_motor.h,DC Motor,SetMotorPID,void,"(int P, int I, int D)",设置电机PID参数
+motor,port_motor.h,Chassis Control,move,void,"(int MoveType, int Speed)",整车移动(前进/后退/左转/右转)
+motor,port_motor.h,Chassis Control,move_time,void,"(int MoveType, int Speed, float Time)",整车移动定时
+motor,port_motor.h,Chassis Control,stop_move,void,(void),停止整车移动
+motor,port_motor.h,Mecanum Wheel,mecanum_wheel_ctrl,void,"(int Speed, int Angle)",麦克纳姆轮速度角度控制
+motor,port_motor.h,Mecanum Wheel,mecanum_wheel_turn,void,"(int Direction, int Speed)",麦克纳姆轮自转
+motor,port_motor.h,Mecanum Wheel,mecanum_wheel_ctrl_turn,void,"(int Speed, int Angle, int TurnSpeed)",麦克纳姆轮混合控制
+servo,port_485servo.h,485 Bus Servo,InitPO16Servo,int,(void),初始化485总线舵机
+servo,port_485servo.h,485 Bus Servo,set_servo_angle,void,"(int ID, int Speed, int Angle)",设置舵机角度(Speed: 0~1023)
+servo,port_485servo.h,485 Bus Servo,set_servo_rotation,void,"(int ID, int Speed)",设置舵机连续旋转模式
+servo,port_485servo.h,485 Bus Servo,set_servo_torque,void,"(int ID, int Enable)",舵机力矩使能/释放
+servo,port_485servo.h,485 Bus Servo,set_servo_torque_fast,void,"(int ID, int Enable)",舵机力矩快速使能
+servo,port_485servo.h,485 Bus Servo,servo_id_change,void,"(int OldID, int NewID)",修改舵机ID
+servo,port_485servo.h,485 Bus Servo,Servo_IDscan,void,(void),扫描总线上所有舵机ID
+servo,port_485servo.h,485 Bus Servo,ReadServoaAngle,int,(int ID),读取舵机当前角度
+servo,port_485servo.h,485 Bus Servo,ReadServoaAngle_NoWait,int,(int ID),无等待读取舵机角度
+servo,port_485servo.h,485 Bus Servo,ReadServoaAngle_NoWait_OK,int,(int ID),检查无等待读取是否完成
+servo,port_485servo.h,485 Bus Servo,ReadServoaVerion,int,(int ID),读取舵机固件版本
+servo,port_485servo.h,485 Bus Servo,PO16_ReadStusError,int,(int ID),读取舵机错误状态
+servo,port_485servo.h,485 Bus Servo,PO16_WriteRegister,int,"(int ID, int Reg, int Data)",写舵机寄存器
+servo,port_485servo.h,485 Bus Servo,PO16_WriteRegister_NoWait,void,"(int ID, int Reg, int Data)",无等待写舵机寄存器
+servo,port_485servo.h,485 Bus Servo,PO16_ReadRegister,int,"(int ID, int Reg)",读舵机寄存器
+servo,port_485servo.h,485 Bus Servo,PO16_ReadRegister_NoWait,void,"(int ID, int Reg)",无等待读舵机寄存器
+servo,port_485servo.h,485 Bus Servo,PO16_EndlessMode,void,(int ID),设置为无限旋转模式
+servo,port_485servo.h,485 Bus Servo,PO16_ServoMode,void,(int ID),设置为伺服模式
+servo,port_485servo.h,485 Bus Servo,Servo_Reset,int,(int ID),复位舵机
+servo,port_485servo.h,485 Bus Servo,Servo_Ping,int,(int ID),Ping舵机在线检测
+servo,port_485servo.h,485 Bus Servo,IsPO16_Connect,int,(int ID),检测指定ID舵机是否在线
+servo,port_485servo.h,485 Bus Servo,getPO16_ConnectID,int,(int Index),获取第N个在线舵机的ID
+servo,port_485servo.h,485 Bus Servo,servo_ctrl,void,"(int ID, int Speed, int Pos, int Mode)",舵机底层控制
+servo,port_485servo.h,485 Bus Servo,angle_to_servo_value,int,(int Angle),角度转舵机值
+servo,port_485servo.h,485 Bus Servo,servo_value_to_angle,int,(int Value),舵机值转角度
+servo,port_485servo.h,485 Bus Servo,to_servo_speed,int,(int Speed),速度值转换
+servo,port_pwmservo.h,PWM Servo,SetServo,void,"(int Port, int Speed, int Angle)",PWM舵机角度设置
+servo,port_pwmservo.h,PWM Servo,ServoInit,void,(void),PWM舵机初始化
+servo,port_pwmservo.h,PWM Servo,SERVO_PWR_ON,void,(void),舵机电源开
+servo,port_pwmservo.h,PWM Servo,SERVO_PWR_OFF,void,(void),舵机电源关
+stepper,step_driver.h,Stepper Motor,set_stepmotor,void,"(int CH, int Speed)",设置步进电机速度(±32000)
+stepper,step_driver.h,Stepper Motor,get_stepmotor_distance,int,(int CH),获取步进电机位移
+stepper,step_driver.h,Stepper Motor,set_stepmotor_acc,void,"(int CH, int Acc)",设置步进电机加速度
+stepper,step_driver.h,Stepper Motor,set_stepmotor_reset,void,(void),步进电机复位清零
+stepper,step_driver.h,Stepper Motor,set_step_servoa,void,"(int ID, int Speed, int Angle)",步进驱动器上485舵机控制
+sensor_ai,port_AI.h,Analog Input,InitADC,void,(int Hardware),初始化ADC模拟输入
+sensor_ai,port_AI.h,Analog Input,getAI,int,(int Port),获取模拟端口值
+sensor_ai,port_AI.h,Analog Input,getAI_Avg,int,(int Port),获取模拟端口平均值
+sensor_ai,port_AI.h,Analog Input,getAI_Max,int,(int Port),获取模拟端口最大值
+sensor_ai,port_AI.h,Analog Input,getAI_Hardware,int,(int Port),获取模拟端口硬件类型
+sensor_ai,port_AI.h,Analog Input,getAICount,int,(void),获取模拟端口数量
+sensor_standard,port_AI_sensor.h,Standard Sensor,get_infrared_distance,int,(int Port),红外测距传感器
+sensor_standard,port_AI_sensor.h,Standard Sensor,obstacle_infrared_detected,int,(int Port),红外障碍物检测
+sensor_standard,port_AI_sensor.h,Standard Sensor,get_single_grayscale,int,(int Port),单灰度传感器值
+sensor_standard,port_AI_sensor.h,Standard Sensor,single_grayscale_detected,int,"(int Port, int LineType)",单灰度颜色检测(黑/白线)
+sensor_standard,port_AI_sensor.h,Standard Sensor,get_ambient_light,int,(int Port),环境光传感器
+sensor_standard,port_AI_sensor.h,Standard Sensor,get_flame,int,(int Port),火焰传感器
+sensor_standard,port_AI_sensor.h,Standard Sensor,magnetic_detected,int,(int Port),磁敏传感器检测
+sensor_standard,port_AI_sensor.h,Standard Sensor,get_sound_volume,int,(int Port),声音传感器音量
+sensor_standard,port_AI_sensor.h,Standard Sensor,button_pressed,int,(int KeyID),控制器按键状态
+sensor_standard,port_AI_sensor.h,Standard Sensor,human_infrared_value,int,(int Port),人体红外传感器
+sensor_standard,port_AI_sensor.h,Standard Sensor,touch_button,int,(int Port),触摸按钮检测
+sensor_standard,port_AI_sensor.h,Standard Sensor,magnetic_encoder,int,"(int Port, int CH)",磁编码器读数
+sensor_standard,port_AI_sensor.h,Standard Sensor,magnetic_encoder_reset,void,(int Port),磁编码器复位
+sensor_i2c,port_i2c_sensor.h,I2C Sensor,get_ultrasonic_distance,int,(int Port),超声波测距
+sensor_i2c,port_i2c_sensor.h,I2C Sensor,color_value,int,(int Port),颜色传感器值
+sensor_i2c,port_i2c_sensor.h,I2C Sensor,color_detected,int,"(int Port, int ColorID)",颜色识别匹配检测
+sensor_i2c,port_i2c_sensor.h,I2C Sensor,color_value_name,float,"(int Port, int Type)",颜色传感器分量值
+sensor_i2c,port_i2c_sensor.h,I2C Sensor,color_bklight,void,"(int Port, int ColorW)",颜色传感器背光
+sensor_i2c,port_i2c_sensor.h,I2C Sensor,get_gesture,int,(int Port),手势传感器
+sensor_i2c,port_i2c_sensor.h,I2C Sensor,gesture_bklight,void,"(int Port, int ColorW)",手势传感器背光
+sensor_i2c,port_i2c_sensor.h,I2C Sensor,get_temperature,float,(int Port),温度传感器(℃)
+sensor_i2c,port_i2c_sensor.h,I2C Sensor,get_humidity,float,(int Port),湿度传感器(%)
+sensor_i2c,port_i2c_sensor.h,I2C Sensor,get_tof,int,(int Port),TOF激光测距
+sensor_i2c,port_i2c_sensor.h,I2C Sensor,tof_bklight,void,"(int Port, int ColorW)",TOF传感器背光
+sensor_i2c,port_i2c_sensor.h,I2C Sensor,getPortSensorType,int,(int Port),获取端口上传感器类型
+sensor_i2c,port_i2c_sensor.h,I2C Sensor,set_RGB,void,"(int Port, int R, int G, int B)",设置RGB灯颜色
+sensor_i2c,port_i2c_sensor.h,I2C Sensor,set_RGB_color,void,"(int Port, int ColorID)",设置RGB灯预设颜色
+sensor_i2c,port_i2c_sensor.h,I2C Sensor,set_RGB_All,void,"(int Port, int R, int G, int B, int W)",设置RGBW灯
+sensor_i2c,port_i2c_sensor.h,I2C Sensor,off_RGB_color,void,(int Port),关闭RGB灯
+sensor_i2c,port_i2c_sensor.h,I2C Sensor,display_digital_tube,void,"(int Port, int Number)",数码管显示数字
+sensor_i2c,port_i2c_sensor.h,I2C Sensor,display_digital_tube_score,void,"(int Port, int S1, int S2)",数码管比分显示
+sensor_i2c,port_i2c_sensor.h,I2C Sensor,off_digital_tube,void,(int Port),关闭数码管
+sensor_i2c,port_i2c_sensor.h,I2C Sensor,digital_tube_bklight,void,"(int Port, int ColorW)",数码管背光
+sensor_i2c,port_i2c_sensor.h,I2C Sensor,gyroscope,float,"(int Port, int Axis)",陀螺仪角速度/角度
+sensor_i2c,port_i2c_sensor.h,I2C Sensor,gyroscope_bklight,void,"(int Port, int ColorW)",陀螺仪背光
+sensor_i2c,port_i2c_sensor.h,Pressure Sensor,get_pressure,float,"(int Port, int CH)",气压传感器(SPL06)
+sensor_i2c,port_i2c_sensor.h,Pressure Sensor,IsPressureConnect,int,(int Port),检测气压传感器连接
+sensor_5gray,port_uart_5gray.h,5-Grayscale,get_integrated_grayscale,int,"(int Port, int CH)",五灰度通道值
+sensor_5gray,port_uart_5gray.h,5-Grayscale,integrated_grayscale_detected,int,"(int Port, int CH, int LineType)",五灰度颜色检测
+sensor_5gray,port_uart_5gray.h,5-Grayscale,Is5GrayConnect,int,(int Port),检测五灰度传感器连接
+sensor_5gray,port_uart_5gray.h,5-Grayscale,Reset5GrayConnect,void,(int Port),重置五灰度连接状态
+sensor_mpu6500,mc602_mpu6500.h,MPU6500 Gyro,InitMPU6500,void,(int Port),初始化MPU6500陀螺仪
+sensor_mpu6500,mc602_mpu6500.h,MPU6500 Gyro,MPU6500_ReadID,int,(int Port),读取MPU6500芯片ID
+sensor_legacy,mc602_sensor.h,Legacy Sensor,jointed_arm,int,"(int Port, int Joystick)",关节臂传感器
+sensor_legacy,mc602_sensor.h,Legacy Sensor,key_button,int,"(int Port, int Key)",扩展按钮板
+sensor_legacy,mc602_sensor.h,Legacy Sensor,infrared_receiver,int,(int Port),红外接收器
+sensor_legacy,mc602_sensor.h,Legacy Sensor,set_rgb_led_strip,void,"(int Port, int LED, int R, int G, int B)",RGB灯带控制
+sensor_legacy,mc602_sensor.h,Legacy Sensor,rgb_led_Reset,void,(void),RGB灯带复位
+ai_camera,AI_Cam.h,AI Camera,get_AI_image,int,(int Port),AI摄像头图像识别
+ai_camera,AI_Cam.h,AI Camera,get_AI_voice,int,(int Port),AI摄像头语音识别
+ai_camera,AI_Cam.h,AI Camera,Init_lane,void,"(int Port, int Color, int Threshold, int Width, int Lane)",AI巡线初始化
+ai_camera,AI_Cam.h,AI Camera,get_AI_lane_value,void,(int Port),获取AI巡线值
+ai_camera,AI_Cam.h,AI Camera,patr_XX,int,(int Speed),AI巡线控制(下红线)
+ai_camera,AI_Cam.h,AI Camera,patr_XL,int,(int Speed),AI巡线控制(上红线)
+ai_camera,AI_Cam.h,AI Camera,patr_time1,void,"(int Speed, float Time)",AI巡线定时(下红线)
+ai_camera,AI_Cam.h,AI Camera,patr_time2,void,"(int Speed, float Time)",AI巡线定时(上红线)
+ai_camera,AI_Cam.h,AI Camera,patr_road1,void,"(int CrossroadID, int Speed, float Time)",AI巡线路口(下红线)
+ai_camera,AI_Cam.h,AI Camera,patr_road2,void,"(int CrossroadID, int Speed, float Time)",AI巡线路口(上红线)
+ai_camera,AI_Cam.h,AI Camera,patr_turn1,void,"(int Offset, int LS, int RS)",AI巡线转弯(下红线)
+ai_camera,AI_Cam.h,AI Camera,patr_turn2,void,"(int Offset, int LS, int RS)",AI巡线转弯(上红线)
+ai_camera,AI_Cam.h,AI Camera,AI_get,int,"(int Port, int RegAddr)",AI摄像头寄存器读
+ai_camera,AI_Cam.h,AI Camera,AI_set,void,"(int Port, int RegAddr, int Data)",AI摄像头寄存器写
+ai_camera,port_i2c_sensor.h,AI Camera (K210),AI_read_value,int,"(int Port, int DataOrder)",K210通用数据读取(v1)
+ai_camera,port_i2c_sensor.h,AI Camera (K210),AI_read_value_v2,int,"(int Port, int Mode, int Para)",K210通用数据读取(v2)
+ai_camera,port_i2c_sensor.h,AI Camera (K210),AI_take_photo,void,"(int Port, int Mode, int Cnt)",K210拍照
+display_lcd,lcd.h,Display (LCD),InitLCD,void,(int Hardware),初始化LCD屏幕
+display_lcd,lcd.h,Display (LCD),ClearLCD,void,(void),清屏
+display_lcd,lcd.h,Display (LCD),LCD_ClearBuffer,void,(void),清除显示缓冲区
+display_lcd,lcd.h,Display (LCD),LCD_Ram2LCD,void,(void),缓冲区刷新到LCD
+display_lcd,lcd.h,Display (LCD),LCD_Disable,void,(void),关闭LCD显示
+display_lcd,lcd.h,Display (LCD),Printf,void,"(char* fmt, ...)",LCD屏幕printf格式化输出
+display_lcd,lcd.h,Display (LCD),show,void,"(int Line, char* fmt, ...)",LCD指定行显示
+display_lcd,lcd.h,Display (LCD),LCD_DrawStringToBuffer,void,"(int X, int Y, char* S, int Mode)",缓冲区绘制字符串
+display_lcd,lcd.h,Display (LCD),LCD_DrawPicToBuffer,void,"(int X, int Y, uint8_t* Data, int Color)",缓冲区绘制图片
+display_lcd,lcd.h,Display (LCD),get_LCD_W,int,(void),获取LCD宽度
+display_lcd,lcd.h,Display (LCD),get_LCD_H,int,(void),获取LCD高度
+display_lcd,lcd.h,Display (LCD),get_LCD_CharH,int,(void),获取字符高度
+display_lcd,lcd.h,Display (LCD),get_LCD_CharW,int,(void),获取字符宽度
+display_lcd,spi_lcd.h,Display (SPI LCD),InitSPI_LCD,void,(void),初始化SPI LCD
+display_lcd,spi_lcd.h,Display (SPI LCD),SPILcd_Clear,void,(int Color),SPI LCD清屏
+display_lcd,spi_lcd.h,Display (SPI LCD),SPILCD_DrawStringToBuffer,void,"(int X, int Y, char* S, int Mode)",SPI LCD绘制字符串
+display_lcd,spi_lcd.h,Display (SPI LCD),SPILCD_DrawPicToBuffer,void,"(int X, int Y, uint8_t* Data, int Color)",SPI LCD绘制图片
+display_lcd,spi_lcd.h,Display (SPI LCD),SPILCD_DrawPicToMask,void,"(int X, int Y, uint8_t* Data, int Color)",SPI LCD蒙层绘图
+display_lcd,spi_lcd.h,Display (SPI LCD),RGB888ToRGB565,uint16_t,(uint32_t Color),RGB888转RGB565颜色
+display_lcd,spi_lcd.h,Display (SPI LCD),LCD_Ram2SPILCD,void,(void),缓冲区刷新到SPI LCD
+display_lcd,spi_lcd.h,Display (SPI LCD),LCDSPI_PutString2Buffer,void,"(int Col, int Page, char* S, int Mode)",SPI LCD文本网格模式
+display_lcd,spi_lcd.h,Display (SPI LCD),SetLCD_Color,int,(int ColorIndex),设置LCD主题色
+display_lcd,spi_lcd.h,Display (SPI LCD),LCD_SPI_SetTitleVisable,void,(int Visable),设置标题栏可见性
+display_led,led.h,LED Indicator,InitLED,void,(int Hardware),初始化板载LED
+display_led,led.h,LED Indicator,SetLED,void,"(int Port, int State)",设置板载LED状态
+display_dot8x8,port_i2c_dot8x8.h,LED Dot Matrix,display_symbol,void,"(int Port, int SymbolID)",8×8点阵显示符号
+display_dot8x8,port_i2c_dot8x8.h,LED Dot Matrix,display_custom,void,"(int Port, int LedMatrix)",8×8点阵自定义显示
+display_dot8x8,port_i2c_dot8x8.h,LED Dot Matrix,display_emotion,void,"(int P1, int P2, int EmoID)",双屏表情显示
+display_dot8x8,port_i2c_dot8x8.h,LED Dot Matrix,display_bklight,void,"(int Port, int LedMatrix, int ColorW)",带背光的点阵显示
+display_dot8x8,port_i2c_dot8x8.h,LED Dot Matrix,off_LED,void,(int Port),关闭点阵显示
+display_dot8x8,port_i2c_dot8x8.h,LED Dot Matrix,off_emotion,void,"(int P1, int P2)",关闭表情显示
+audio,beep_wav.h,Audio (WAV),InitBeepWav,void,(void),初始化WAV音频播放
+audio,beep_wav.h,Audio (WAV),play_sound,void,(int SoundIndex),播放指定编号音效
+audio,beep_wav.h,Audio (WAV),StopSound,void,(void),停止播放
+audio,beep_wav.h,Audio (WAV),recorder,void,(int Port),录音
+audio,beep_wav.h,Audio (WAV),play_record,void,(void),播放录音
+audio,beep_wav.h,Audio (WAV),read_number,void,(int Value),语音报数
+audio,beep_wav.h,Audio (WAV),SetSoundVol,void,(int Vol),设置音量
+audio,beep_wav.h,Audio (WAV),getBTSoundIndex,int,(int BTIndex),蓝牙音效索引转换
+audio,beep_simple.h,Buzzer,InitBeepSimple,void,(void),初始化蜂鸣器
+audio,beep_simple.h,Buzzer,beep,void,"(int Freq, float Second)",蜂鸣器频率+时长发音
+bluetooth,port_btremote.h,Bluetooth Remote,InitBTRemote,void,(void),初始化蓝牙遥控器
+bluetooth,port_btremote.h,Bluetooth Remote,get_bt_remote_control,int,(int CH),读取蓝牙遥控器通道值
+bluetooth,port_btremote.h,Bluetooth Remote,getBtName,char*,(void),获取蓝牙名称
+bluetooth,port_btremote.h,Bluetooth Remote,getbtstatus,int,(void),获取蓝牙连接状态
+bluetooth,port_btremote.h,Bluetooth Remote,getBTdata,int,(int Index),获取蓝牙原始数据
+bluetooth,port_btremote.h,Bluetooth Remote,isNewBtData,int,(void),检测是否有新蓝牙数据
+bluetooth,uart_bt.h,Bluetooth UART,InitUart_Bluetooth,void,(void),初始化蓝牙串口
+bluetooth,uart_bt.h,Bluetooth UART,UartBluetooth_Sendbyte,void,(uint8_t Data),蓝牙串口发送单字节
+bluetooth,uart_bt.h,Bluetooth UART,UartBluetooth_Sendbytes,void,"(uint8_t* Data, int Len)",蓝牙串口发送多字节
+bluetooth,uart_bt.h,Bluetooth UART,setUartBluetooth_RxHandle,void,(FunType Handler),设置蓝牙接收回调
+comms_uart,uart_p1.h,UART Port1,InitUart_Port1,void,(void),初始化P1串口
+comms_uart,uart_p1.h,UART Port1,UartPort1_Sendbyte,void,(uint8_t Data),P1串口发送单字节
+comms_uart,uart_p1.h,UART Port1,UartPort1_Sendbytes,void,"(uint8_t* Data, int Len)",P1串口发送多字节
+comms_uart,uart_p1.h,UART Port1,setUartPort1_RxHandle,void,(FunType Handler),设置P1接收回调
+comms_uart,uart_p2.h,UART Port2,InitUart_Port2,void,(void),初始化P2串口
+comms_uart,uart_p2.h,UART Port2,UartPort2_Sendbyte,void,(uint8_t Data),P2串口发送单字节
+comms_uart,uart_p2.h,UART Port2,UartPort2_Sendbytes,void,"(uint8_t* Data, int Len)",P2串口发送多字节
+comms_uart,uart_p2.h,UART Port2,setUartPort2_RxHandle,void,(FunType Handler),设置P2接收回调
+comms_uart,uart_pc.h,UART PC (USB),InitUart_PC,void,(void),初始化PC串口(USB虚拟串口)
+comms_uart,uart_pc.h,UART PC (USB),UartPC_Sendbyte,void,(uint8_t Data),PC串口发送单字节
+comms_uart,uart_pc.h,UART PC (USB),UartPC_Sendbytes,void,"(uint8_t* Data, int Len)",PC串口发送多字节
+comms_uart,uart_pc.h,UART PC (USB),setUartPC_RxHandle,void,(FunType Handler),设置PC串口接收回调
+comms_uart,uart_pc.h,UART PC (USB),Printf2UartPC,void,"(char* fmt, ...)",PC串口printf输出(调试用)
+comms_uart,uart_pc.h,UART PC (USB),checksum,uint8_t,"(uint8_t* Data, int Len)",数据校验和计算
+comms_uart,uart_pc_debug.h,UART Debug,InitPCDebug,void,(void),初始化调试串口
+comms_uart,uart_pc_debug.h,UART Debug,uart_pc_debug_rx_callback,void,(uint8_t Data),调试串口接收回调
+comms_uart,uart_pi.h,UART Pi,InitUart_Pi,void,(void),初始化树莓派串口
+comms_uart,uart_pi.h,UART Pi,UartPi_Sendbyte,void,(uint8_t Data),树莓派串口发送单字节
+comms_uart,uart_pi.h,UART Pi,UartPi_Sendbytes,void,"(uint8_t* Data, int Len)",树莓派串口发送多字节
+comms_uart,uart_pi.h,UART Pi,setUartPi_RxHandle,void,(FunType Handler),设置树莓派接收回调
+comms_uart,uart_pi.h,UART Pi,Printf2UartPi,void,"(char* fmt, ...)",树莓派串口printf输出
+comms_485,uart_485.h,RS485 Bus,InitUart_Port485,void,(int Hardware),初始化485总线
+comms_485,uart_485.h,RS485 Bus,UartPort485_Sendbyte,void,(uint8_t Data),485发送单字节
+comms_485,uart_485.h,RS485 Bus,UartPort485_Sendbytes,void,"(uint8_t* Data, int Len)",485发送多字节
+comms_485,uart_485.h,RS485 Bus,setUartPort485_RxHandle,void,(FunType Handler),设置485接收回调
+comms_485,uart_485.h,RS485 Bus,calchecksum,uint8_t,(uint8_t* Data),485总线校验和
+comms_i2c,port_i2c.h,I2C Bus,I2C_InitX,void,(void),初始化I2C总线
+comms_i2c,port_i2c.h,I2C Bus,i2c_read,int,"(int Port, int DevAddr, int AddrW, int Reg, int Len, uint8_t* Buf)",I2C读取
+comms_i2c,port_i2c.h,I2C Bus,i2c_write,int,"(int Port, int DevAddr, int AddrW, int Reg, int Len, uint8_t* Buf)",I2C写入
+comms_i2c,port_i2c.h,I2C Bus,SetI2C_Clock,void,(int NewClock),设置I2C时钟频率
+system_power,power_key.h,Power & Keys,InitPowerCtrl,void,(void),初始化电源控制
+system_power,power_key.h,Power & Keys,PowerCtrl_On,void,(void),系统上电
+system_power,power_key.h,Power & Keys,PowerCtrl_Off,void,(void),系统断电
+system_power,power_key.h,Power & Keys,PowerOffSytem,void,(void),系统关机
+system_power,power_key.h,Power & Keys,InitKeys,void,(int Hardware),初始化按键
+system_power,power_key.h,Power & Keys,getKey,int,(int KeyName),获取按键状态
+system_power,power_key.h,Power & Keys,wait_keyup,void,(int KeyName),等待按键释放
+system_power,power_key.h,Power & Keys,wait_keydown,void,(int KeyName),等待按键按下
+system_power,power_key.h,Power & Keys,wait_keyclick,void,(int KeyName),等待按键单击
+system_power,power_key.h,Power & Keys,enterkey_exitprogram,void,(int Enable),设置Enter键是否可退出程序
+system_battery,battery.h,Battery Management,InitBatt,void,(void),初始化电池检测
+system_battery,battery.h,Battery Management,getBatt,int,(void),获取电池电压(mV)
+system_battery,battery.h,Battery Management,getBatt_AVG,int,(void),获取电池平均电压
+system_battery,battery.h,Battery Management,getBattPercentage,int,(void),获取电池电量百分比
+system_battery,battery.h,Battery Management,SetAutoPowerOff,int,(void),设置自动关机时间
+system_battery,battery.h,Battery Management,getAutoPowerOff,int,(void),获取自动关机设置
+system_battery,battery.h,Battery Management,SetAutoPowerDisable,void,(void),禁用自动关机
+system_battery,battery.h,Battery Management,getBatt_type,int,(void),获取电池类型(2S/3S)
+system_battery,battery.h,Battery Management,SetBatt_type,int,(void),切换电池类型(2S/3S)
+system_battery,battery.h,Battery Management,IsBattError,int,(void),检测电池异常
+system_program,program_run.h,Program Control,Program_Reset,void,(void),系统复位
+system_program,program_run.h,Program Control,Program_Run,void,(uint32_t Address),跳转到指定地址运行
+system_program,program_run.h,Program Control,SetRamFlag,void,(uint8_t Flag),设置RAM标记
+system_program,program_run.h,Program Control,ResetRamFlag,void,(void),清除RAM标记
+system_program,program_run.h,Program Control,GetRamFlag,uint8_t,(void),获取RAM标记
+system_flash,internal_flash.h,Internal Flash,ReadEEPROM,int,(int Addr),读取EEPROM(内部Flash模拟)
+system_flash,internal_flash.h,Internal Flash,WriteEEPROM,void,"(int Addr, int Data)",写入EEPROM
+system_flash,internal_flash.h,Internal Flash,WriteEEPROMBufffer,void,"(int Addr, int Data)",EEPROM缓冲写入(批量)
+system_flash,internal_flash.h,Internal Flash,SyncEEBufferToFlash,int,(void),同步EEPROM缓冲到Flash
+system_flash,internal_flash.h,Internal Flash,SyncEEFlashToBuffer,void,(void),从Flash同步到EEPROM缓冲
+system_flash,internal_flash.h,Internal Flash,WriteEEPROM_FileName,int,(char* Filename),保存程序文件名到EEPROM
+system_flash,internal_flash.h,Internal Flash,ReadEEPROM_FileName,char*,(void),读取存储的程序文件名
+system_flash,internal_flash.h,Internal Flash,WriteEEPROM_BTName,int,(char* BTName),保存蓝牙名称到EEPROM
+system_flash,internal_flash.h,Internal Flash,ReadEEPROM_BTName,char*,(void),读取存储的蓝牙名称
+system_flash,internal_flash.h,Internal Flash,WriteRamBuffer,void,"(int Offset, uint8_t Data)",写RAM缓冲区(下载用)
+system_flash,internal_flash.h,Internal Flash,WriteRam2Flash,int,(uint32_t Addr),RAM缓冲烧录到Flash
+system_flash,internal_flash.h,Internal Flash,WriteRam2InternalFlash,int,(uint32_t Addr),RAM缓冲烧录到内部Flash
+system_flash,internal_flash.h,Internal Flash,CrcCode,uint32_t,(uint32_t Addr),CRC32校验Flash区域
+system_flash,internal_flash.h,Internal Flash,IsRamSameAsInternalFlash,int,(uint32_t Addr),比较RAM与Flash一致性
+system_flash,internal_flash.h,Internal Flash,SaveSoundData,int,"(int Index, uint32_t Data)",保存音频数据到Flash
+system_flash,internal_flash.h,Internal Flash,ClearRecodeFlash,int,(void),清除录音区Flash
+system_flash,spi_flash.h,External SPI Flash,SPI_FLASH_Init,void,(void),初始化外部SPI Flash
+system_flash,spi_flash.h,External SPI Flash,sFLASH_ReadID,uint32_t,(void),读取SPI Flash芯片ID
+system_flash,spi_flash.h,External SPI Flash,sFLASH_ReadBuffer,void,"(uint8_t* Buf, uint32_t Addr, uint16_t Len)",读取SPI Flash数据
+system_flash,spi_flash.h,External SPI Flash,sFLASH_WriteBuffer,void,"(uint8_t* Buf, uint32_t Addr, uint16_t Len)",写入SPI Flash数据
+system_flash,spi_flash.h,External SPI Flash,sFLASH_EraseSector,void,(uint32_t Addr),擦除SPI Flash扇区
+system_flash,spi_flash.h,External SPI Flash,LoadBin,int,(int Index),从SPI Flash加载程序
+system_flash,spi_flash.h,External SPI Flash,LoadBinByName,int,(char* Filename),按文件名加载程序
+system_flash,spi_flash.h,External SPI Flash,getFileName,char*,(int Index),获取SPI Flash中程序文件名
+system_flash,spi_flash.h,External SPI Flash,UpdateFileName,int,(void),更新文件名索引
+system_usb,usb_vbus.h,USB Management,Init_VBUS,void,(void),初始化USB检测
+system_usb,usb_vbus.h,USB Management,IsUSBConnect,int,(void),检测USB是否连接
+system_usb,usb_vbus.h,USB Management,USB2MASS,void,(void),切换到U盘模式
+system_usb,usb485.h,USB-485 Bridge,USB485,void,(void),启动USB转485协议转发
+system_timer,systemtimer.h,System Timer,InitSystemTimer,void,(void),初始化系统定时器
+system_timer,systemtimer.h,System Timer,sleep,void,(float Second),阻塞延时(秒)
+system_timer,systemtimer.h,System Timer,sleep_us,void,(int US),阻塞延时(微秒)
+system_timer,systemtimer.h,System Timer,seconds,float,(void),获取运行时间(秒)
+system_timer,systemtimer.h,System Timer,resettime,void,(void),复位运行计时器
+system_timer,systemtimer.h,System Timer,setTimerHandle,void,"(FunType Handler, int MS)",设置定时回调
+system_timer,systemtimer.h,System Timer,DeInitTimerCallBack,void,(void),取消定时回调
+system_timer,systemtimer.h,System Timer,setstoptime_us,void,(int US),设置精确停止时间
+system_timer,systemtimer.h,System Timer,waitstoptime_us,void,(void),等待精确停止时间
+system_thread,thread.h,Thread (FreeRTOS),wait,void,(float Seconds),线程延时(非阻塞)
+system_thread,thread.h,Thread (FreeRTOS),ThreadStart,void,(void* Func),创建新线程
+system_thread,thread.h,Thread (FreeRTOS),ThreadDelete,void,(void),删除当前线程
+system_thread,thread.h,Thread (FreeRTOS),ThreadSuspendAll,void,(void),挂起所有线程
+system_thread,thread.h,Thread (FreeRTOS),ThreadResumeAll,void,(void),恢复所有线程
+system_thread,thread.h,Thread (FreeRTOS),vTaskStartScheduler,void,(void),启动FreeRTOS调度器
+system_devicename,devicename.h,Device Info,InitDeviceName,void,(void),初始化设备名称(读取硬件跳线)
+system_devicename,devicename.h,Device Info,getHARDWARE,int,(void),获取硬件版本
+system_devicename,devicename.h,Device Info,getSOFRWARE,int,(void),获取软件版本
+system_digout,digoutput.h,Digital Output,InitDo,void,(int Hardware),初始化数字输出
+system_digout,digoutput.h,Digital Output,SetDO,void,"(int Port, int State)",设置数字输出端口
+system_digout,digoutput.h,Digital Output,setDO,void,"(int Channel, int State)",设置数字输出(兼容旧接口)
+system_digout,digoutput.h,Digital Output,ToggleDO,void,(int Port),翻转数字输出
+system_runapp,mc602_runapp.h,App Manager,getFileName_MC602,char*,(int Index),获取用户程序文件名(RunA~F)
+system_runapp,mc602_runapp.h,App Manager,LoadBin_602,uint32_t,(int Index),加载指定槽位用户程序
+system_runapp,mc602_runapp.h,App Manager,LoadBinByName_602,void,(char* Filename),按文件名加载用户程序
+system_dmpcar,dmp_car.h,Balance Car,BlanceCar,void,"(int GyroPort, int MLeft, int MRight)",自平衡小车控制
+math,port_math.h,Math,abs,int,(int Value),绝对值(int)
+math,port_math.h,Math,math_abs,float,(float Value),绝对值(float)
+math,port_math.h,Math,constrain,int,"(int Amt, int Low, int High)",约束范围(int)
+math,port_math.h,Math,constrainf,float,"(float Amt, float Low, float High)",约束范围(float)
+math,port_math.h,Math,random_number,int,"(int Min, int Max)",随机数
+math,port_math.h,Math,math_modulus,int,"(int A, int B)",取模运算
+math,port_math.h,Math,math_round,float,(float Value),四舍五入
+math,port_math.h,Math,math_floor,float,(float Value),向下取整
+math,port_math.h,Math,math_ceiling,float,(float Value),向上取整
+math,port_math.h,Math,math_sqrt,float,(float Value),平方根
+math,port_math.h,Math,math_sin,float,(float Value),正弦
+math,port_math.h,Math,math_cos,float,(float Value),余弦
+math,port_math.h,Math,math_tan,float,(float Value),正切
+math,port_math.h,Math,math_asin,float,(float Value),反正弦
+math,port_math.h,Math,math_acos,float,(float Value),反余弦
+math,port_math.h,Math,math_atan,float,(float Value),反正切
+math,port_math.h,Math,math_ln,float,(float Value),自然对数
+math,port_math.h,Math,math_log,float,(float Value),常用对数(log10)
+math,port_math.h,Math,math_exp,float,(float Value),指数函数(e^x)
+math,port_math.h,Math,math_pow10,float,(float Value),10的幂(10^x)
+patrol,Goline.h,Patrol (Goline),patrol_integrated_initialization,void,"(int LM, int LS, int RM, int RS)",巡线初始化(集成灰度)
+patrol,Goline.h,Patrol (Goline),patrol_single_initialization,void,"(int LM, int LS, int RM, int RS, int P1~P5)",巡线初始化(单灰度)
+patrol,Goline.h,Patrol (Goline),patrol_init_mecanum_wheel_integrated,void,"(int LB, int RB, int LF, int RF)",麦克纳姆轮巡线初始化(集成)
+patrol,Goline.h,Patrol (Goline),patrol_init_mecanum_wheel_single,void,"(int LB, int RB, int LF, int RF, int P1~P5)",麦克纳姆轮巡线初始化(单)
+patrol,Goline.h,Patrol (Goline),patrol_ambient_detection,void,(void),巡线环境采集(黑白校准)
+patrol,Goline.h,Patrol (Goline),patrol_speed,void,(int Speed),巡线速度控制
+patrol,Goline.h,Patrol (Goline),patrol_road,void,"(int Type, int Speed, float Time)",路口巡线(左/T字/右)
+patrol,Goline.h,Patrol (Goline),patrol_time,void,"(int Speed, float Time)",定时巡线
+patrol,Goline.h,Patrol (Goline),patrol_turn,void,"(int Type, int LS, int RS)",巡线转弯
+patrol,Goline.h,Patrol (Goline),start_motor_time,void,"(int LS, int RS, float Time)",启动电机-时间
+patrol,Goline.h,Patrol (Goline),start_motor_angle,void,"(int LS, int RS, int Angle)",启动电机-角度
+patrol,Goline.h,Patrol (Goline),start_motor_sensor,void,"(int LS, int RS, int Port, int Comp, int Val)",启动电机-传感器
+patrol,Goline.h,Patrol (Goline),patrol_button,void,(void),巡线按钮启动
+dance,play_dance.h,Dance,play_dance,void,(void),播放舞蹈动作
+actionpage,play_page.h,Action Page,play_page,void,(int Page),播放指定动作页(1~127)
+actionpage,play_page.h,Action Page,quit_page,int,(void),退出动作页(播放退出页)
+actionpage,play_page.h,Action Page,stop_page,int,(void),强制停止动作页
+actionpage,play_page.h,Action Page,getplay_page_index,int,(void),获取当前播放页编号
+actionpage,play_page.h,Action Page,getplay_page_action,int,(void),获取当前播放步骤编号
+actionpage,play_page.h,Action Page,getplay_page_repeat,int,(void),获取当前重复次数
+actionpage,play_page.h,Action Page,IsPagePlaying,int,(void),判断是否正在播放
+actionpage,play_page.h,Action Page,ServoaBatchSetAngle,void,"(int Angles[20], int Speeds[20])",批量设置20路舵机角度
+actionpage,play_page.h,Action Page,InitPageDebug,void,(void),启动舵机动作页调试模式
+actionpage,play_page.h,Action Page,StartServoDebug,void,(void),上位机启动舵机调试
+actionpage,play_page.h,Action Page,IsServoaDebug,int,(void),判断是否处于舵机调试状态
+actionpage,play_page.h,Action Page,InitServoMotionTimer,void,(void),初始化动作页10ms定时器

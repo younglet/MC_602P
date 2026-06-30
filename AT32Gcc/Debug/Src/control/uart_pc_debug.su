@@ -1,0 +1,2 @@
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\uart_pc_debug.c:94:6:uart_pc_debug_rx_callback	32	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\uart_pc_debug.c:174:6:InitPCDebug	0	static

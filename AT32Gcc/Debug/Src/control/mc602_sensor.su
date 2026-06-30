@@ -1,0 +1,6 @@
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\mc602_sensor.c:35:5:jointed_arm	24	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\mc602_sensor.c:54:5:key_button	72	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\mc602_sensor.c:90:5:infrared_receiver	24	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\mc602_sensor.c:147:5:limit_switch	8	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\mc602_sensor.c:187:6:set_rgb_led_strip	64	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\control\mc602_sensor.c:321:6:rgb_led_Reset	24	static

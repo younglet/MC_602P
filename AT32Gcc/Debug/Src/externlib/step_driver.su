@@ -1,0 +1,7 @@
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\externlib\step_driver.c:89:13:StepDriver_RevCallBack	4	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\externlib\step_driver.c:134:13:StepMotorThread	64	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\externlib\step_driver.c:210:6:set_stepmotor	16	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\externlib\step_driver.c:236:6:set_stepmotor_acc	8	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\externlib\step_driver.c:254:5:get_stepmotor_distance	0	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\externlib\step_driver.c:273:6:set_stepmotor_reset	8	static
+.\AI_Module_GCC\MC_602P\AT32Gcc\Src\externlib\step_driver.c:285:6:set_step_servoa	16	static
