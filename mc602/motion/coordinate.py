@@ -14,15 +14,14 @@ Uses homogeneous 2D transforms (SE2).
 from __future__ import annotations
 import math
 from dataclasses import dataclass
-from .kinematics import BodyVelocity
-from .odometry import Pose2D
+from .mecanum import BodyVelocity, Pose2D
 
 
 @dataclass
 class Transform2D:
-    """2D rigid transform (translation + rotation)."""
-    x: float = 0.0
-    y: float = 0.0
+    """2D rigid transform (translation in cm, rotation in rad)."""
+    x: float = 0.0   # cm
+    y: float = 0.0   # cm
     theta: float = 0.0  # radians
 
     @classmethod
@@ -70,7 +69,7 @@ class Transform2D:
         return Transform2D(nx, ny, self.theta + other.theta)
 
     def __repr__(self):
-        return (f"Transform2D(x={self.x:.3f}, y={self.y:.3f}, "
+        return (f"Transform2D(x={self.x:.2f}cm, y={self.y:.2f}cm, "
                 f"θ={math.degrees(self.theta):.1f}°)")
 
     def to_tuple(self):

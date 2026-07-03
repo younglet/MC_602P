@@ -19,7 +19,7 @@ grandparent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", 
 sys.path.insert(0, grandparent_dir)
 
 from mc602 import (
-    MC602, M1, M2, M3, M4,
+    MC602, M1, M2, M3, M4, MotorChassis,
     SerialNotFoundError, ConnectionError, TimeoutError,
 )
 
@@ -71,18 +71,18 @@ def test_set_speeds_basic(bot) -> None:
     print("\n── 2. set_speeds 基本功能 ──")
 
     # 全速前进
-    bot.mecanum.stop_all()
+    chassis.stop_all()
     time.sleep(0.2)
 
     try:
-        bot.mecanum.set_speeds(80, 80, 80, 80)
+        chassis.set_speeds(80, 80, 80, 80)
         ok("set_speeds(80,80,80,80)", "无异常")
     except Exception as e:
         fail("set_speeds 前进", str(e))
         return
     time.sleep(1.0)
 
-    e1, e2, e3, e4 = bot.mecanum.get_encoders()
+    e1, e2, e3, e4 = chassis.get_encoders()
     # 正转, 编码器应 > 0
     checks = [e1 > 0, e2 > 0, e3 > 0, e4 > 0]
     n_ok = sum(checks)
@@ -92,12 +92,12 @@ def test_set_speeds_basic(bot) -> None:
         fail("编码器正向", f"只有 {n_ok}/4 路为正: {e1} {e2} {e3} {e4}")
 
     # 反转
-    bot.mecanum.stop_all()
+    chassis.stop_all()
     time.sleep(0.2)
-    bot.mecanum.set_speeds(-80, -80, -80, -80)
+    chassis.set_speeds(-80, -80, -80, -80)
     time.sleep(1.0)
-    bot.mecanum.stop_all()
-    e1, e2, e3, e4 = bot.mecanum.get_encoders()
+    chassis.stop_all()
+    e1, e2, e3, e4 = chassis.get_encoders()
     # 反转, 编码器应减小 (相对于之前)
     ok("反向运转", f"e1={e1} e2={e2} e3={e3} e4={e4}")
 
@@ -109,29 +109,29 @@ def test_set_speeds_basic(bot) -> None:
 def test_status_and_stop(bot) -> None:
     print("\n── 3. 状态读取 & 停止 ──")
 
-    bot.mecanum.stop_all()
+    chassis.stop_all()
     time.sleep(0.1)
 
     # 停止状态
-    s1, s2, s3, s4 = bot.mecanum.get_statuses()
+    s1, s2, s3, s4 = chassis.get_statuses()
     if all(s == 0 for s in (s1, s2, s3, s4)):
         ok("停止态", f"全部=0")
     else:
         fail("停止态", f"有非零: {s1} {s2} {s3} {s4}")
 
     # 运行状态
-    bot.mecanum.set_speeds(80, 80, 80, 80)
+    chassis.set_speeds(80, 80, 80, 80)
     time.sleep(0.3)
-    s1, s2, s3, s4 = bot.mecanum.get_statuses()
+    s1, s2, s3, s4 = chassis.get_statuses()
     if all(s == 1 for s in (s1, s2, s3, s4)):
         ok("运行态", f"全部=1")
     else:
         ok("运行态", f"{s1} {s2} {s3} {s4} (可能有堵转/超时)")
 
     # stop_all
-    bot.mecanum.stop_all()
+    chassis.stop_all()
     time.sleep(0.1)
-    s1, s2, s3, s4 = bot.mecanum.get_statuses()
+    s1, s2, s3, s4 = chassis.get_statuses()
     if all(s == 0 for s in (s1, s2, s3, s4)):
         ok("stop_all", "全部停")
     else:
@@ -146,19 +146,19 @@ def test_latency(bot) -> None:
     print("\n── 4. 延迟对比 ──")
     n_warmup = 3
     n_trials = 10
-    bot.mecanum.stop_all()
+    chassis.stop_all()
 
     # 组控 set_speeds warmup
     for _ in range(n_warmup):
         try:
-            bot.mecanum.set_speeds(0, 0, 0, 0)
+            chassis.set_speeds(0, 0, 0, 0)
         except Exception:
             time.sleep(0.1)
     times_group = []
     for _ in range(n_trials):
         t0 = time.monotonic()
         try:
-            bot.mecanum.set_speeds(0, 0, 0, 0)
+            chassis.set_speeds(0, 0, 0, 0)
             dt = (time.monotonic() - t0) * 1000
             times_group.append(dt)
         except Exception:
@@ -218,14 +218,14 @@ def test_encoder_latency(bot) -> None:
     # 组控 get_encoders
     for _ in range(n_warmup):
         try:
-            bot.mecanum.get_encoders()
+            chassis.get_encoders()
         except Exception:
             time.sleep(0.05)
     times_group = []
     for _ in range(n_trials):
         t0 = time.monotonic()
         try:
-            bot.mecanum.get_encoders()
+            chassis.get_encoders()
             dt = (time.monotonic() - t0) * 1000
             times_group.append(dt)
         except Exception:
@@ -277,9 +277,9 @@ def test_encoder_latency(bot) -> None:
 
 def test_sync_sampling(bot) -> None:
     print("\n── 6. 同步采样 (set_speeds + 连续 get_encoders) ──")
-    bot.mecanum.stop_all()
+    chassis.stop_all()
     time.sleep(0.2)
-    bot.mecanum.set_speeds(80, 80, 80, 80)
+    chassis.set_speeds(80, 80, 80, 80)
     time.sleep(SETTLE_TIME)
 
     all_rows: Dict[int, list] = {1: [], 2: [], 3: [], 4: []}
@@ -299,7 +299,7 @@ def test_sync_sampling(bot) -> None:
         n_samples += 1
 
         try:
-            e1, e2, e3, e4 = bot.mecanum.get_encoders()
+            e1, e2, e3, e4 = chassis.get_encoders()
         except Exception:
             n_timeouts += 1
             next_t = max(next_t, time.monotonic() - t0 + SAMPLE_DT)
@@ -315,7 +315,7 @@ def test_sync_sampling(bot) -> None:
             last_encs[port] = enc
         next_t += SAMPLE_DT
 
-    bot.mecanum.stop_all()
+    chassis.stop_all()
 
     # 统计 per port
     stats = {}
@@ -369,10 +369,10 @@ def test_mecanum_motions(bot) -> None:
 
     for name, (m1, m2, m3, m4) in patterns:
         try:
-            bot.mecanum.set_speeds(m1, m2, m3, m4)
+            chassis.set_speeds(m1, m2, m3, m4)
             time.sleep(0.5)
-            e1, e2, e3, e4 = bot.mecanum.get_encoders()
-            bot.mecanum.stop_all()
+            e1, e2, e3, e4 = chassis.get_encoders()
+            chassis.stop_all()
             time.sleep(0.2)
             ok(name, f"enc={e1},{e2},{e3},{e4}")
         except Exception as e:
@@ -386,7 +386,7 @@ def test_mecanum_motions(bot) -> None:
 
 def test_stress(bot) -> None:
     print("\n── 8. 压力测试 (快速切换 ×30) ──")
-    bot.mecanum.stop_all()
+    chassis.stop_all()
     time.sleep(0.2)
 
     n_ok = 0
@@ -398,14 +398,14 @@ def test_stress(bot) -> None:
         else:
             speeds = (-80, -80, -80, -80)
         try:
-            bot.mecanum.set_speeds(*speeds)
+            chassis.set_speeds(*speeds)
             n_ok += 1
         except TimeoutError:
             n_to += 1
         except Exception as e:
             fail(f"stress[{i}]", str(e))
 
-    bot.mecanum.stop_all()
+    chassis.stop_all()
 
     print(f"  {n_ok}/30 OK, {n_to} 超时")
     if n_ok >= 29:
@@ -432,6 +432,7 @@ def main() -> int:
         return 1
 
     with bot:
+        chassis = MotorChassis(bot, ports=(1, 2, 3, 4))
         if not test_firmware(bot):
             return 1
 

@@ -21,7 +21,7 @@ import time
 grandparent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, grandparent_dir)
 
-from mc602 import MC602, SerialNotFoundError, ConnectionError, BTPadState
+from mc602 import MC602, SerialNotFoundError, ConnectionError, BTPadState, MotorChassis
 
 # ─── 可调参数 ──────────────────────────────────────────────
 LOOP_HZ   = 10            # 控制频率
@@ -59,6 +59,7 @@ def main() -> int:
 
     try:
         bot = MC602.connect()
+        chassis = MotorChassis(bot, ports=(1, 2, 3, 4))
     except (SerialNotFoundError, ConnectionError) as e:
         print(f"[!] 连接失败: {e}")
         return 1
@@ -109,7 +110,7 @@ def main() -> int:
 
             # L1+R1 → 退出 (用 & 而非 ==, 容忍其他键同时按)
             if (btn & (1 << BTN_L1)) and (btn & (1 << BTN_R1)):
-                bot.mecanum.stop_all()
+                chassis.stop_all()
                 print("\n  [L1+R1] 退出")
                 break
 
@@ -123,7 +124,7 @@ def main() -> int:
             if pressed & (1 << BTN_CROSS):
                 stopped = not stopped
                 if stopped:
-                    bot.mecanum.stop_all()
+                    chassis.stop_all()
                     last_m = (0, 0, 0, 0)
                 print(f"  [▽] {'停' if stopped else '行'}")
 
@@ -136,7 +137,7 @@ def main() -> int:
                 if m != last_m:
                     last_m = m
                     try:
-                        bot.mecanum.set_speeds(*m)
+                        chassis.set_speeds(*m)
                     except Exception:
                         pass
             else:

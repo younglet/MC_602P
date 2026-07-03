@@ -32,7 +32,6 @@ from .exceptions import (
 )
 from ..services.motor import MotorService
 from ..services.system import SystemService
-from ..services.mecanum import MecanumGroupService
 from ..drivers.btpad import BTPad
 from .packet import (
     Op,
@@ -104,7 +103,6 @@ class MC602:
         # 子 API
         self.system  = SystemService(self)
         self.motor   = MotorService(self)
-        self.mecanum = MecanumGroupService(self)
         self.pad = BTPad(self)
 
     def __enter__(self) -> "MC602":
