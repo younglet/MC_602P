@@ -6,7 +6,9 @@ import os
 grandparent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, grandparent_dir)
 
+import statistics
 import time
+from typing import Dict, List, Optional, Tuple
 
 from mc602 import MC602, M1, SerialNotFoundError, ConnectionError
 SAMPLE_DT    = 0.20   # 200ms 采样 (5Hz) — 避开固件竞态丢帧

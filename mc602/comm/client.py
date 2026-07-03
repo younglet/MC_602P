@@ -229,16 +229,35 @@ class MC602:
 
     def _request(self, op: Op, svc: int, inst: int, prop: int,
                  value: bytes = b"",
-                 timeout: float = 2.0) -> Payload:
-        seq = self._allocate_seq()
-        payload = Payload(seq=seq, op=op, svc=svc, inst=inst, prop=prop, value=value)
-        self._send_frame(payload)
-        return self._await_response(seq, timeout)
+                 timeout: float = 2.0,
+                 retry: int = 0,
+                 retry_delay: float = 0.1) -> Payload:
+        """发送一帧请求, 等待响应, 可选自动重试.
+
+        retry: 超时后额外重试次数 (0=不发重试).
+        retry_delay: 重试前等待秒数, 给固件 UART handler 喘息窗口.
+        """
+        last_err = None
+        for attempt in range(retry + 1):
+            seq = self._allocate_seq()
+            payload = Payload(seq=seq, op=op, svc=svc, inst=inst, prop=prop, value=value)
+            # 必须先在 _pending 里占一个坑, 再发包 — 否则 MCU 快速响应时
+            # reader 线程可能比 _await_response 更早拿到响应帧, 然后发现
+            # seq 还没注册就直接丢弃 (race condition, 概率性丢响应)。
+            with self._seq_lock:
+                self._pending[seq] = None
+                self._pending_event.clear()
+            self._send_frame(payload)
+            try:
+                return self._await_response(seq, timeout)
+            except TimeoutError as e:
+                last_err = e
+                if attempt < retry:
+                    time.sleep(retry_delay)
+        raise last_err  # type: ignore[misc]
 
     def _await_response(self, seq: int, timeout: float) -> Payload:
-        with self._seq_lock:
-            self._pending[seq] = None
-            self._pending_event.clear()
+        # seq 已在 _request 里预先注册过了, 这里不再重复
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             self._pending_event.wait(timeout=0.05)
@@ -263,6 +282,10 @@ class MC602:
     def discover(self, timeout: float = DEFAULT_RW_TIMEOUT) -> List[int]:
         seq = self._allocate_seq()
         payload = Payload(seq=seq, op=Op.DISCOVER, svc=0, inst=0, prop=0)
+        # 同 _request: 先占坑再发, 避免快速响应的 race
+        with self._seq_lock:
+            self._pending[seq] = None
+            self._pending_event.clear()
         self._send_frame(payload)
         resp = self._await_response(seq, timeout)
         return list(resp.value)

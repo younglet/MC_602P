@@ -6,7 +6,9 @@ import os
 grandparent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, grandparent_dir)
 
+import statistics
 import time
+from typing import Dict, List, Optional, Tuple
 
 from mc602 import (
     MC602, M1, M2, M3, M4, M5, M6,
@@ -51,7 +53,8 @@ def sample_4motors(bot, ports, targets, duration, dt):
             else:
                 speed = 0.0
             rows[p].append((t, enc, speed))
-        next_t += dt
+        # 任何一次超时都会让墙钟跑过头, 需要把采样时钟拉回来
+        next_t = max(next_t, time.monotonic() - t0 + dt)
     for p in ports:
         try:
             bot.motor.stop(p)

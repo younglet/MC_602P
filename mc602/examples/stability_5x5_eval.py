@@ -6,7 +6,9 @@ import os
 grandparent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, grandparent_dir)
 
+import statistics
 import time
+from typing import Dict, List, Optional, Tuple
 
 from mc602 import (
     MC602, M1, M2, M3, M4,
@@ -14,20 +16,36 @@ from mc602 import (
 )
 SAMPLE_DT   = 0.20
 DURATION    = 2.0
-INTER_CALL  = 0.030
+INTER_CALL  = 0.050        # 固件 UART @高RPM 容易拥塞, >30ms 更稳
 SETTLE_TIME = 0.30
-RECOVERY_WAIT = 0.5  # 测试间等待 (让固件喘气)
-TARGET_SPEED = 20
+RECOVERY_WAIT = 1.0        # 测试间等待 (让固件喘气, 80 档需要更久)
+TARGET_SPEED = 80
+SETUP_RETRY = 3            # setup 失败重试次数
 N_REPEAT     = 5
+
+def _setup_motor(bot, port, target):
+    """带重试的电机 setup: reset_encoder + set_speed, 最多 SETUP_RETRY 次"""
+    for attempt in range(SETUP_RETRY):
+        try:
+            bot.motor.reset_encoder(port)
+        except Exception as ex:
+            if attempt == SETUP_RETRY - 1:
+                raise
+            time.sleep(0.15)
+            continue
+        try:
+            bot.motor.set_speed(port, target)
+        except Exception as ex:
+            if attempt == SETUP_RETRY - 1:
+                raise
+            time.sleep(0.15)
+            continue
+        return  # 成功
+    raise Exception("setup retries exhausted")
 def single_test(bot, port, target, duration, dt) -> Optional[Dict]:
     """单次测, 返回 {mean, stdev, cv, n_samples, n_timeouts} 或 None (失败)"""
     try:
-        bot.motor.reset_encoder(port)
-    except Exception:
-        return None
-    time.sleep(INTER_CALL)
-    try:
-        bot.motor.set_speed(port, target)
+        _setup_motor(bot, port, target)
     except Exception:
         return None
     time.sleep(SETTLE_TIME)
@@ -46,7 +64,12 @@ def single_test(bot, port, target, duration, dt) -> Optional[Dict]:
             enc = bot.motor.get_encoder(port)
         except Exception:
             n_timeouts += 1
-            enc = last_enc
+            time.sleep(0.04)  # 超时后小退避, 给固件 UART 续命
+            # 不记录假采样 — 用 stale encoder 会在下一次成功采样时算出
+            # 离谱的大速度 (dt 小但 Δenc 跨了整个超时期)。跳过后 next_t
+            # 对齐到墙钟, 下一拍的 speed 自动归一化到正确的平均速度。
+            next_t = max(next_t, time.monotonic() - t0 + dt)
+            continue
         t = time.monotonic() - t0
         if samples:
             last_t, last_enc_prev, _ = samples[-1]

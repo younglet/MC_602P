@@ -57,13 +57,15 @@ class MotorService:
 
     def set_speed(self, port: int, speed: int) -> None:
         """设置电机目标速度 (-100~100)。进入 PID 速度闭环模式。
-        speed=0 立即停止电机并退出 PID。"""
+        speed=0 立即停止电机并退出 PID。
+        超时自动重试 2 次 (固件 UART 在高 RPM 下可能短暂拥塞)。"""
         self._check_port(port)
         if not (-100 <= speed <= 100):
             raise ValueError(f"speed 必须在 -100~100, 收到 {speed}")
         self._bot._request(
             Op.SET, self.SVC, port, self.PROP_SPEED,
             value=bytes([speed & 0xFF]),
+            timeout=1.0, retry=2, retry_delay=0.1,
         )
 
     def get_speed(self, port: int) -> int:
@@ -76,12 +78,18 @@ class MotorService:
 
     def get_encoder(self, port: int) -> int:
         self._check_port(port)
-        r = self._bot._request(Op.GET, self.SVC, port, self.PROP_ENCODER)
+        r = self._bot._request(
+            Op.GET, self.SVC, port, self.PROP_ENCODER,
+            timeout=0.5, retry=0,  # 快速失败: 固件要么<10ms 响应, 要么卡死
+        )
         return int.from_bytes(r.value, "little", signed=True)
 
     def reset_encoder(self, port: int) -> None:
         self._check_port(port)
-        self._bot._request(Op.CALL, self.SVC, port, self.CALL_RESET_ENCODER)
+        self._bot._request(
+            Op.CALL, self.SVC, port, self.CALL_RESET_ENCODER,
+            timeout=1.0, retry=2, retry_delay=0.1,
+        )
 
     # ----- 状态 -----
 
@@ -138,7 +146,10 @@ class MotorService:
 
     def stop(self, port: int = M1) -> None:
         self._check_port(port)
-        self._bot._request(Op.CALL, self.SVC, port, self.CALL_STOP)
+        self._bot._request(
+            Op.CALL, self.SVC, port, self.CALL_STOP,
+            timeout=1.0, retry=2, retry_delay=0.1,
+        )
 
     def stop_all(self) -> None:
         """逐个停所有电机。inst=0 在协议层会被拒，所以退化到循环。"""
