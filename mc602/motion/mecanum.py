@@ -91,6 +91,7 @@ class MecanumMotion:
 
         self._pose = Pose2D()
         self._last_enc = (0, 0, 0, 0)
+        self._has_baseline = False   # 首次 update_odometry 只设基准, 不算位移
         self.total_distance = 0.0
 
     # ── kinematics ────────────────────────────────────
@@ -111,6 +112,13 @@ class MecanumMotion:
 
     def update_odometry(self, e1: int, e2: int, e3: int, e4: int) -> Pose2D:
         """Encoder values → update pose. Returns current pose."""
+        # 首次调用: 只把当前编码器存为基准, 不算位移
+        # (避免把"绝对编码器值"误算成 delta 导致车瞬移到 (10000, 10000))
+        if not self._has_baseline:
+            self._last_enc = (e1, e2, e3, e4)
+            self._has_baseline = True
+            return self._pose
+
         prev = self._last_enc
         d1 = e1 - prev[0]
         d2 = e2 - prev[1]
@@ -140,5 +148,5 @@ class MecanumMotion:
 
     def reset_pose(self, x=0.0, y=0.0, theta=0.0) -> None:
         self._pose = Pose2D(x, y, theta)
-        self._last_enc = (0, 0, 0, 0)
+        # 不再重置 _last_enc / _has_baseline: 保留编码器基准, 避免 reset 后瞬移
         self.total_distance = 0.0

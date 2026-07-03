@@ -32,7 +32,19 @@ class MecanumChassis:
                  track: float = 30.0,
                  wheel_base: float = 28.0,
                  wheel_radius: float = 3.0,
-                 encoder_ppr: int = 1):
+                 encoder_ppr: int = 2048):
+        """Mecanum car.
+
+        Args:
+            bot:          MC602 instance
+            ports:        4 motor ports in order (FL, FR, RL, RR)
+            track:        left-right distance (cm)
+            wheel_base:   front-rear distance (cm)
+            wheel_radius: wheel radius (cm)
+            encoder_ppr:  pulses per wheel revolution.
+                          Common: N20=210, TT霍尔=260/390, AB相512线×4=2048.
+                          !! 必须与实际电机匹配, 不然里程计角度会放大 N 倍 !!
+        """
         self._chassis = Motors(bot, ports)
         self._motion = MecanumMotion(
             track=track, wheel_base=wheel_base,
