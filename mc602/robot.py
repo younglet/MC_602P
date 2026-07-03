@@ -14,8 +14,8 @@ from __future__ import annotations
 from typing import Optional
 
 from .comm.client import MC602, find_ch340_port
-from .devices.motor import Motor
-from .devices.system import System
+from .drivers.motor import Motor
+from .drivers.system import System
 from .comm.exceptions import SerialNotFoundError
 
 
