@@ -10,7 +10,8 @@ import statistics
 import time
 from typing import Dict, List, Optional, Tuple
 
-from mc602 import MC602, M1, SerialNotFoundError, ConnectionError
+from mc602 import MC602, M1, M2, M3, M4, SerialNotFoundError, ConnectionError
+PORT = M1  # ← 改这里选电机
 SAMPLE_DT    = 0.20   # 200ms 采样 (5Hz) — 避开固件竞态丢帧
 DURATION     = 3.0    # 总采样时间
 SETTLE_PCT   = 0.10   # 稳态带 ±10%
