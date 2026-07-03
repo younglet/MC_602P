@@ -47,13 +47,14 @@ from .comm.exceptions import (
     VerificationError,
     WhalesBotError,  # 历史别名（= MC602Error）
 )
-from .devices import Motor, System
+from .drivers import Motor, System
 from .robot import Robot
 from .services import MotorService, SystemService
 from .services.mecanum import MecanumGroupService
+from .drivers.btpad import BTPad, BTPadState
 
 # 端口常量
-from .devices.constants import (
+from .drivers.constants import (
     # 电机
     M1, M2, M3, M4, M5, M6, MotorAll,
     # 端口
@@ -77,7 +78,7 @@ __all__ = [
     # 高层 API
     "Robot", "Motor", "System",
     # 底层 API
-    "MC602", "MotorService", "SystemService", "MecanumGroupService", "find_ch340_port",
+    "MC602", "MotorService", "SystemService", "MecanumGroupService", "BTPad", "BTPadState", "find_ch340_port",
     # 异常
     "MC602Error", "WhalesBotError",
     "ConnectionError", "ProtocolError", "TimeoutError",

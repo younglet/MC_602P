@@ -25,7 +25,7 @@ from typing import Dict, List, Optional
 import serial  # type: ignore
 import serial.tools.list_ports as list_ports  # type: ignore
 
-from ..devices.constants import M1
+from ..drivers.constants import M1
 from .exceptions import (
     ConnectionError,
     SerialNotFoundError,
@@ -33,6 +33,7 @@ from .exceptions import (
 from ..services.motor import MotorService
 from ..services.system import SystemService
 from ..services.mecanum import MecanumGroupService
+from ..drivers.btpad import BTPad
 from .packet import (
     Op,
     Payload,
@@ -104,6 +105,7 @@ class MC602:
         self.system  = SystemService(self)
         self.motor   = MotorService(self)
         self.mecanum = MecanumGroupService(self)
+        self.pad = BTPad(self)
 
     def __enter__(self) -> "MC602":
         self.open()

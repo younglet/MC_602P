@@ -11,7 +11,7 @@ import time
 from typing import Dict
 
 from ..comm.packet import Op, Payload, Status
-from ..devices.constants import M1
+from ..drivers.constants import M1
 
 
 class MotorService:
