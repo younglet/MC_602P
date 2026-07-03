@@ -52,6 +52,8 @@ from .robot import Robot
 from .services import MotorService, SystemService
 from .services.mecanum import MecanumGroupService
 from .drivers.btpad import BTPad, BTPadState
+from .motion import (MecanumKinematics, WheelSpeeds, BodyVelocity,
+                     Odometry, Pose2D, Transform2D)
 
 # 端口常量
 from .drivers.constants import (
@@ -78,7 +80,9 @@ __all__ = [
     # 高层 API
     "Robot", "Motor", "System",
     # 底层 API
-    "MC602", "MotorService", "SystemService", "MecanumGroupService", "BTPad", "BTPadState", "find_ch340_port",
+    "MC602", "MotorService", "SystemService", "MecanumGroupService", "BTPad", "BTPadState",
+    "MecanumKinematics", "WheelSpeeds", "BodyVelocity",
+    "Odometry", "Pose2D", "Transform2D", "find_ch340_port",
     # 异常
     "MC602Error", "WhalesBotError",
     "ConnectionError", "ProtocolError", "TimeoutError",
