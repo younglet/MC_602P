@@ -1,8 +1,8 @@
 """
-btremote_mecanum.py — 蓝牙遥控器控麦克纳姆车
+pad_mecanum.py — 蓝牙遥控器控麦克纳姆车
 
 配对蓝牙手柄后运行, 用摇杆实时控制 4 路电机.
-死区和校准由 BTPadService 内置, 可通过属性修改.
+死区/校准在 BTPad.calibrate() 中处理.
 
 操作:
   左摇杆 ↑↓    前进/后退

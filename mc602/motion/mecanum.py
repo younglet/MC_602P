@@ -1,13 +1,13 @@
 """
-mc602.motion.mecanum — Mecanum kinematics + odometry (pure math)
+mc602.motion.mecanum — Mecanum kinematics + odometry.
 
-No RPC, no mc602 imports — unit-testable in isolation.
+No RPC, no mc602 imports. All units in cm.
 
     m = MecanumMotion(track=30, wheel_base=28, wheel_radius=3, encoder_ppr=2048)
-    w = m.inverse(vx=30, vy=0, omega=0.5)       # body → wheels (cm/s)
-    b = m.forward(w)                              # wheels → body
-    m.update_odometry(e1, e2, e3, e4)             # encoder → pose
-    print(m.pose)                                 # Pose2D(x=..., y=..., θ=...)
+    w = m.inverse(vx=30, vy=0, omega=0.5)
+    b = m.forward(w)
+    m.update_odometry(e1, e2, e3, e4)
+    print(m.pose)
 """
 
 from __future__ import annotations
@@ -69,7 +69,6 @@ class MecanumMotion:
     def __init__(self, track: float = 30.0, wheel_base: float = 28.0,
                  wheel_radius: float = 3.0, encoder_ppr: int = 1,
                  roller_adjust: float = 1.052):
-        # -- kinematics matrices --
         roller_angle = math.pi / 4 * roller_adjust
         self._tan_r = math.tan(roller_angle)
         self._wc = (track / 2) * self._tan_r + (wheel_base / 2)
@@ -87,16 +86,14 @@ class MecanumMotion:
             [ wc,  wc,  wc,  wc],
         ])
 
-        # -- encoder → distance --
         self._enc_to_dist = (2 * math.pi * wheel_radius) / encoder_ppr \
             if encoder_ppr > 0 else 0
 
-        # -- odometry state --
         self._pose = Pose2D()
         self._last_enc = (0, 0, 0, 0)
         self.total_distance = 0.0
 
-    # ═══ kinematics ═══════════════════════════════════════
+    # ── kinematics ────────────────────────────────────
 
     def inverse(self, vx=0.0, vy=0.0, omega=0.0) -> WheelSpeeds:
         """Body velocity (cm/s, rad/s) → wheel linear speeds (cm/s)."""
@@ -110,7 +107,7 @@ class MecanumMotion:
         body = wv @ self._M_fwd
         return BodyVelocity(float(body[0]), float(body[1]), float(body[2]))
 
-    # ═══ odometry ════════════════════════════════════════
+    # ── odometry ─────────────────────────────────────
 
     def update_odometry(self, e1: int, e2: int, e3: int, e4: int) -> Pose2D:
         """Encoder values → update pose. Returns current pose."""
@@ -121,13 +118,11 @@ class MecanumMotion:
         d4 = e4 - prev[3]
         self._last_enc = (e1, e2, e3, e4)
 
-        # encoder delta → wheel distance (cm)
         w = WheelSpeeds(
             self._enc_to_dist * d1, self._enc_to_dist * d2,
             self._enc_to_dist * d3, self._enc_to_dist * d4)
         body = self.forward(w)
 
-        # integrate into world frame
         cos_t = math.cos(self._pose.theta)
         sin_t = math.sin(self._pose.theta)
         self._pose.x += body.vx * cos_t - body.vy * sin_t

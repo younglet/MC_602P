@@ -1,7 +1,7 @@
 """
-test_mecanum_group.py — MecanumGroup 组控性能测试
+test_mecanum_group.py — MotorChassisService 组控性能测试
 
-验证固件 service 0x02 (mecanum_group_handler) 与 Python MecanumGroupService.
+验证固件 service 0x02 (mecanum_group_handler) 与 Python MotorChassisService.
 重点测:
   1. 基本功能: set_speeds / get_encoders / get_statuses / stop_all
   2. 延迟: 组控 vs 逐路 (1 帧 vs 4 帧)

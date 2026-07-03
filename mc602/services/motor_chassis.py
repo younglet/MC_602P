@@ -72,7 +72,7 @@ class MotorChassisService:
                 except Exception:
                     pass
 
-    stop_all = stop  # alias for backward compat
+    stop_all = stop
 
     def get_statuses(self) -> tuple:
         """Read motor statuses (0=stopped, 1=running, 2=stalled)."""
