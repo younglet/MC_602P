@@ -368,6 +368,104 @@ static uint8_t motor_handler(uint8_t op, uint8_t inst, uint8_t prop,
 }
 
 /* ====================================================================
+ * Service: Mecanum Group (0x02) — 4 路麦克纳姆轮组控
+ *
+ * 一次指令控制 M1~M4 全部四路, 避免逐路调用的串口延迟和时序不同步.
+ * inst 固定为 0 (组操作).
+ *
+ * Props:
+ *   0x01 speeds     4×i8  W   [M1_speed, M2_speed, M3_speed, M4_speed]
+ *   0x02 encoders   4×i32 R   [M1_enc, M2_enc, M3_enc, M4_enc] 每路 i32le
+ *   0x03 statuses   4×u8  R   [M1_st, M2_st, M3_st, M4_st]
+ * Commands:
+ *   0x80 stop_all           停全部 4 路
+ * ==================================================================== */
+
+static uint8_t mecanum_group_handler(uint8_t op, uint8_t inst, uint8_t prop,
+                                     const uint8_t *in_data, uint8_t in_len,
+                                     uint8_t *out_data, uint8_t *out_len)
+{
+    (void)inst;  /* group操作, inst 固定为 0 */
+
+    switch (op) {
+    case OP_GET:
+        switch (prop) {
+        case 0x02: { /* encoders: 4 × i32le */
+            for (int i = 0; i < 4; i++) {
+                int32_t enc = motor_encoder(i + 1);
+                out_data[i * 4 + 0] = (uint8_t)(enc & 0xFF);
+                out_data[i * 4 + 1] = (uint8_t)((enc >> 8) & 0xFF);
+                out_data[i * 4 + 2] = (uint8_t)((enc >> 16) & 0xFF);
+                out_data[i * 4 + 3] = (uint8_t)((enc >> 24) & 0xFF);
+            }
+            *out_len = 16;
+            return STATUS_OK;
+        }
+        case 0x03: { /* statuses: 4 × u8 */
+            for (int i = 0; i < 4; i++) {
+                MotorPID *pid = &motor_pid[i];
+                if (pid->mode == PID_MODE_OFF) {
+                    out_data[i] = 0;
+                } else if (pid->stalled) {
+                    out_data[i] = 2;
+                } else if (pid->mode == PID_MODE_POSITION && pid->at_target) {
+                    out_data[i] = 3;
+                } else if (pid->timed_out) {
+                    out_data[i] = 4;
+                } else {
+                    out_data[i] = 1;
+                }
+            }
+            *out_len = 4;
+            return STATUS_OK;
+        }
+        default:
+            return STATUS_NOT_FOUND;
+        }
+
+    case OP_SET:
+        switch (prop) {
+        case 0x01: { /* speeds: 4 × i8 */
+            if (in_len < 4) return STATUS_RANGE_ERR;
+            for (int i = 0; i < 4; i++) {
+                int8_t spd = (int8_t)in_data[i];
+                MotorPID *pid = &motor_pid[i];
+                if (spd < -100) spd = -100;
+                if (spd >  100) spd =  100;
+                if (spd == 0) {
+                    pid_stop(pid);
+                    set_motor(i + 1, 0);
+                } else {
+                    pid_set_speed(pid, spd);
+                }
+            }
+            *out_len = 0;
+            return STATUS_OK;
+        }
+        default:
+            return STATUS_READ_ONLY;
+        }
+
+    case OP_CALL:
+        switch (prop) {
+        case 0x80: { /* stop_all */
+            for (int i = 0; i < 4; i++) {
+                pid_stop(&motor_pid[i]);
+                set_motor(i + 1, 0);
+            }
+            *out_len = 0;
+            return STATUS_OK;
+        }
+        default:
+            return STATUS_NOT_FOUND;
+        }
+
+    default:
+        return STATUS_NOT_FOUND;
+    }
+}
+
+/* ====================================================================
  * 初始化
  * ==================================================================== */
 
@@ -378,9 +476,10 @@ void rx_process_start(void)
         pid_init(&motor_pid[i]);
     }
 
-    /* 注册 Service (只 2 个: System + Motor) */
-    proto_service_register(0xFE, "System", system_handler);
-    proto_service_register(0x01, "Motor",  motor_handler);
+    /* 注册 Service (System + Motor + MecanumGroup) */
+    proto_service_register(0xFE, "System",  system_handler);
+    proto_service_register(0x01, "Motor",   motor_handler);
+    proto_service_register(0x02, "Mecanum", mecanum_group_handler);
 
     /* 启动 PID 控制线程 (200Hz, 5ms 周期) */
     ThreadStart(pid_control_loop);

@@ -32,6 +32,7 @@ from .exceptions import (
 )
 from ..services.motor import MotorService
 from ..services.system import SystemService
+from ..services.mecanum import MecanumGroupService
 from .packet import (
     Op,
     Payload,
@@ -100,8 +101,9 @@ class MC602:
         self._reader_stop = threading.Event()
 
         # 子 API
-        self.system = SystemService(self)
-        self.motor  = MotorService(self)
+        self.system  = SystemService(self)
+        self.motor   = MotorService(self)
+        self.mecanum = MecanumGroupService(self)
 
     def __enter__(self) -> "MC602":
         self.open()

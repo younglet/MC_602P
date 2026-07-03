@@ -50,6 +50,7 @@ from .comm.exceptions import (
 from .devices import Motor, System
 from .robot import Robot
 from .services import MotorService, SystemService
+from .services.mecanum import MecanumGroupService
 
 # 端口常量
 from .devices.constants import (
@@ -76,7 +77,7 @@ __all__ = [
     # 高层 API
     "Robot", "Motor", "System",
     # 底层 API
-    "MC602", "MotorService", "SystemService", "find_ch340_port",
+    "MC602", "MotorService", "SystemService", "MecanumGroupService", "find_ch340_port",
     # 异常
     "MC602Error", "WhalesBotError",
     "ConnectionError", "ProtocolError", "TimeoutError",

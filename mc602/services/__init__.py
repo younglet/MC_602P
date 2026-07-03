@@ -7,5 +7,6 @@ mc602.services — 底层 Service RPC 客户端（薄包装）
 
 from .motor import MotorService
 from .system import SystemService
+from .mecanum import MecanumGroupService
 
-__all__ = ["MotorService", "SystemService"]
+__all__ = ["MotorService", "SystemService", "MecanumGroupService"]
