@@ -11,11 +11,11 @@ python tools/flash/flash.py                    # 烧录 tools/flash/Run.bin
 ## 控制 MC602P
 
 ```python
-from mc602 import MC602, MotorChassis, MecanumChassis, BTPad
+from mc602 import MC602, MultiMotors, MecanumChassis, BTPad
 
 with MC602.connect() as bot:
     # 通用 N 电机底盘
-    chassis = MotorChassis(bot, ports=(1, 2, 3, 4))
+    chassis = MultiMotors(bot, ports=(1, 2, 3, 4))
     chassis.set_speeds(50, -50, -50, 50)       # 1 帧 4 路
     e1, e2, e3, e4 = chassis.get_encoders()
 
@@ -42,12 +42,12 @@ mc602/
 ├── services/                薄 RPC 包装
 │   ├── motor.py             MotorService      (SVC 0x01)
 │   ├── system.py            SystemService     (SVC 0xFE)
-│   ├── motor_chassis.py     MotorChassisService (SVC 0x02, N=4; 逐路 N≠4)
+│   ├── multi_motors.py      MultiMotorService (SVC 0x02, N=4; 逐路 N≠4)
 │   └── btpad.py             BTPadService      (SVC 0x03)
 ├── drivers/                 面向对象设备
 │   ├── motor.py             Motor(port)
 │   ├── system.py            System
-│   ├── motor_chassis.py     MotorChassis (端口映射)
+│   ├── multi_motors.py       MultiMotors (端口映射)
 │   ├── mecanum_chassis.py   MecanumChassis (底盘 + 运动学)
 │   └── btpad.py             BTPad (死区/校准/KEY_MAP)
 ├── motion/                  纯数学 (无 RPC)
@@ -70,7 +70,7 @@ m.get_encoder(port)
 
 ### 多电机底盘
 ```python
-ch = MotorChassis(bot, ports=(1,2,3,4))   # 端口顺序可配
+ch = MultiMotors(bot, ports=(1,2,3,4))   # 端口顺序可配
 ch.set_speeds(50, -50, -50, 50)          # 1 帧 4 路
 ch.get_encoders()                         # (e1, e2, e3, e4)
 ch.stop()

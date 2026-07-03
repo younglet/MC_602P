@@ -1,20 +1,17 @@
 """
-mc602.drivers.motor_chassis — Generic multi-motor chassis
+mc602.drivers.multi_motors — Generic multi-motor driver
 
-Wraps MotorChassisService with port mapping.
-Supports any number of motors; port order is user-configurable.
-
-    chassis = MotorChassis(bot, ports=(3,1,4,2))
-    chassis.set_speeds(50, -50, -50, 50)
-    e1, e2, e3, e4 = chassis.get_encoders()
+    m = MultiMotors(bot, ports=(3,1,4,2))
+    m.set_speeds(50, -50, -50, 50)
+    e1, e2, e3, e4 = m.get_encoders()
 """
 
 from __future__ import annotations
-from ..services.motor_chassis import MotorChassisService
+from ..services.multi_motors import MultiMotorService
 
 
-class MotorChassis:
-    """Generic multi-motor chassis driver.
+class MultiMotors:
+    """Generic multi-motor driver.
 
     Args:
         bot:   MC602 instance
@@ -25,7 +22,7 @@ class MotorChassis:
     def __init__(self, bot, ports: tuple = (1, 2, 3, 4)):
         self._ports = tuple(ports)
         self._n = len(ports)
-        self._svc = MotorChassisService(bot, ports)
+        self._svc = MultiMotorService(bot, ports)
 
     @property
     def ports(self) -> tuple:

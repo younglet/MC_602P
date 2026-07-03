@@ -1,16 +1,16 @@
 """
-mecanum_group_demo.py — MotorChassis demo (1 frame, 4 motors)
+mecanum_group_demo.py — MultiMotors demo (1 frame, 4 motors)
 """
 import sys, os, time
 grandparent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, grandparent_dir)
 
-from mc602 import MC602, MotorChassis, SerialNotFoundError, ConnectionError
+from mc602 import MC602, MultiMotors, SerialNotFoundError, ConnectionError
 
 
 def main():
     bot = MC602.connect()
-    chassis = MotorChassis(bot, ports=(1, 2, 3, 4))
+    chassis = MultiMotors(bot, ports=(1, 2, 3, 4))
     with bot:
         print(f"{bot._port_name}, FW={bot.system.version}, V={bot.system.voltage:.2f}V")
 

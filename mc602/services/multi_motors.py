@@ -1,7 +1,7 @@
 """
-mc602.services.motor_chassis — Multi-motor chassis RPC
+mc602.services.multi_motors — Multi-motor RPC.
 
-Generic N-motor chassis. When N=4, uses MecanumGroup (SVC 0x02, 1 frame).
+When N=4, uses MecanumGroup (SVC 0x02, 1 frame).
 Otherwise degrades to per-motor calls (SVC 0x01).
 """
 
@@ -9,11 +9,11 @@ from __future__ import annotations
 from ..comm.packet import Op
 
 
-class MotorChassisService:
-    """Multi-motor chassis RPC.
+class MultiMotorService:
+    """Multi-motor RPC.
 
     Args:
-        bot:  MC602 instance
+        bot:   MC602 instance
         ports: motor port numbers, e.g. (3,1,4,2)
     """
 
