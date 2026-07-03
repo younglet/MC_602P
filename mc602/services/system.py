@@ -29,7 +29,8 @@ class SystemService:
 
     @property
     def voltage_mv(self) -> int:
-        r = self._bot._request(Op.GET, self.SVC, 0, self.PROP_VOLTAGE)
+        r = self._bot._request(Op.GET, self.SVC, 0, self.PROP_VOLTAGE,
+                               timeout=1.0, retry=2, retry_delay=0.05)
         return int.from_bytes(r.value, "little", signed=False)
 
     @property
@@ -38,18 +39,21 @@ class SystemService:
 
     @property
     def version(self) -> str:
-        r = self._bot._request(Op.GET, self.SVC, 0, self.PROP_VERSION)
+        r = self._bot._request(Op.GET, self.SVC, 0, self.PROP_VERSION,
+                               timeout=1.0, retry=2, retry_delay=0.05)
         slen = r.value[0]
         return r.value[1:1 + slen].decode("ascii", errors="replace")
 
     @property
     def uptime(self) -> int:
-        r = self._bot._request(Op.GET, self.SVC, 0, self.PROP_UPTIME)
+        r = self._bot._request(Op.GET, self.SVC, 0, self.PROP_UPTIME,
+                               timeout=1.0, retry=2, retry_delay=0.05)
         return int.from_bytes(r.value, "little", signed=False)
 
     @property
     def watchdog_ms(self) -> int:
-        r = self._bot._request(Op.GET, self.SVC, 0, self.PROP_WATCHDOG_MS)
+        r = self._bot._request(Op.GET, self.SVC, 0, self.PROP_WATCHDOG_MS,
+                               timeout=1.0, retry=2, retry_delay=0.05)
         return int.from_bytes(r.value, "little", signed=False)
 
     @watchdog_ms.setter
