@@ -1,5 +1,5 @@
 """
-mc602.services.multi_motors — Multi-motor RPC.
+mc602.services.motors — Multi-motor RPC.
 
 When N=4, uses MecanumGroup (SVC 0x02, 1 frame).
 Otherwise degrades to per-motor calls (SVC 0x01).
@@ -9,20 +9,32 @@ from __future__ import annotations
 from ..comm.packet import Op
 
 
-class MultiMotorService:
+def _port_int(port) -> int:
+    """Convert port spec to int. Accepts int, "M1"-"M6", or "M" + int."""
+    if isinstance(port, int):
+        return port
+    if isinstance(port, str):
+        s = port.strip().upper()
+        if s.startswith("M"):
+            return int(s[1:])
+        return int(s)
+    raise TypeError(f"port must be int or str, got {type(port).__name__}")
+
+
+class MotorsService:
     """Multi-motor RPC.
 
     Args:
         bot:   MC602 instance
-        ports: motor port numbers, e.g. (3,1,4,2)
+        ports: motor port numbers or names, e.g. (1,2,3,4) or (M1,M2,M3,M4)
     """
 
     SVC_GROUP = 0x02
 
     def __init__(self, bot, ports: tuple):
         self._bot = bot
-        self._ports = tuple(ports)
-        self._n = len(ports)
+        self._ports = tuple(_port_int(p) for p in ports)
+        self._n = len(self._ports)
         self._fast = (self._n == 4)  # SVC 0x02 supports 4 motors exactly
 
     def set_speeds(self, *speeds: int) -> None:

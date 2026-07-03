@@ -21,7 +21,7 @@ import time
 grandparent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, grandparent_dir)
 
-from mc602 import MC602, SerialNotFoundError, ConnectionError, BTPadState, MultiMotors
+from mc602 import MC602, SerialNotFoundError, ConnectionError, BTPadState, Motors
 
 # ─── 可调参数 ──────────────────────────────────────────────
 LOOP_HZ   = 10            # 控制频率
@@ -59,7 +59,7 @@ def main() -> int:
 
     try:
         bot = MC602.connect()
-        chassis = MultiMotors(bot, ports=(1, 2, 3, 4))
+        chassis = Motors(bot, ports=(1, 2, 3, 4))
     except (SerialNotFoundError, ConnectionError) as e:
         print(f"[!] 连接失败: {e}")
         return 1

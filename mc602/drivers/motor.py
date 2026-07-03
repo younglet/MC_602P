@@ -64,11 +64,13 @@ class MotorPID:
 class Motor:
     """per-instance 电机对象 (M1~M6)"""
 
-    def __init__(self, bot, port: int):
+    def __init__(self, bot, port):
+        if isinstance(port, str):
+            port = int(port.strip().upper().lstrip("M"))
         if not (1 <= port <= 6):
             raise ValueError(f"port 必须在 1~6, 收到 {port}")
         self._bot = bot
-        self._service: MotorService = bot.motor
+        self._service = bot.motor if bot is not None else None
         self.port = port
 
     # ----- 速度模式 -----

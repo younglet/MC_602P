@@ -1,28 +1,28 @@
 """
-mc602.drivers.multi_motors — Generic multi-motor driver
+mc602.drivers.motors — Multi-motor driver
 
-    m = MultiMotors(bot, ports=(3,1,4,2))
+    m = Motors(bot, ports=(3, 1, 4, 2))   # int ports
+    m = Motors(bot, ports=("M3", "M1", "M4", "M2"))  # str ports
     m.set_speeds(50, -50, -50, 50)
     e1, e2, e3, e4 = m.get_encoders()
 """
 
 from __future__ import annotations
-from ..services.multi_motors import MultiMotorService
+from ..services.motors import MotorsService
 
 
-class MultiMotors:
+class Motors:
     """Generic multi-motor driver.
 
     Args:
         bot:   MC602 instance
-        ports: motor port numbers in desired order
-               e.g. (3,1,4,2) swaps front motors
+        ports: port numbers or names, e.g. (1,2,3,4) or (M1,M2,M3,M4)
     """
 
     def __init__(self, bot, ports: tuple = (1, 2, 3, 4)):
         self._ports = tuple(ports)
         self._n = len(ports)
-        self._svc = MultiMotorService(bot, ports)
+        self._svc = MotorsService(bot, ports)
 
     @property
     def ports(self) -> tuple:

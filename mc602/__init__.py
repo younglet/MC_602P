@@ -50,9 +50,9 @@ from .comm.exceptions import (
 from .drivers import Motor, System
 from .robot import Robot
 from .services import MotorService, SystemService
-from .services.multi_motors import MultiMotorService
+from .services.motors import MotorsService
 from .drivers.btpad import BTPad, BTPadState
-from .drivers.multi_motors import MultiMotors
+from .drivers.motors import Motors
 from .drivers.mecanum_chassis import MecanumChassis
 from .motion import (MecanumMotion, WheelSpeeds, BodyVelocity,
                      Pose2D, Transform2D)
@@ -82,9 +82,9 @@ __all__ = [
     # 高层 API
     "Robot", "Motor", "System",
     # 底层 API
-    "MC602", "MotorService", "SystemService", "MultiMotorService",
+    "MC602", "MotorService", "SystemService", "MotorsService",
     "BTPad", "BTPadState",
-    "MultiMotors", "MecanumChassis",
+    "Motors", "MecanumChassis",
     "MecanumMotion", "WheelSpeeds", "BodyVelocity",
     "Pose2D", "Transform2D",
     # 异常

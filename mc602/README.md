@@ -11,12 +11,12 @@ python tools/flash/flash.py                    # 烧录 tools/flash/Run.bin
 ## 控制 MC602P
 
 ```python
-from mc602 import MC602, MultiMotors, MecanumChassis, BTPad
+from mc602 import MC602, Motors, MecanumChassis, BTPad
 
 with MC602.connect() as bot:
     # 通用 N 电机底盘
-    chassis = MultiMotors(bot, ports=(1, 2, 3, 4))
-    chassis.set_speeds(50, -50, -50, 50)       # 1 帧 4 路
+    chassis = Motors(bot, ports=(1, 2, 3, 4))         # 或 ("M1","M2","M3","M4")
+    chassis.set_speeds(50, -50, -50, 50)              # 1 帧 4 路
     e1, e2, e3, e4 = chassis.get_encoders()
 
     # 麦克纳姆车 (底盘 + 运动学 + 里程计)
@@ -47,7 +47,7 @@ mc602/
 ├── drivers/                 面向对象设备
 │   ├── motor.py             Motor(port)
 │   ├── system.py            System
-│   ├── multi_motors.py       MultiMotors (端口映射)
+│   ├── motors.py            Motors (端口映射)
 │   ├── mecanum_chassis.py   MecanumChassis (底盘 + 运动学)
 │   └── btpad.py             BTPad (死区/校准/KEY_MAP)
 ├── motion/                  纯数学 (无 RPC)
@@ -70,7 +70,7 @@ m.get_encoder(port)
 
 ### 多电机底盘
 ```python
-ch = MultiMotors(bot, ports=(1,2,3,4))   # 端口顺序可配
+ch = Motors(bot, ports=(1,2,3,4))   # 端口顺序可配, 也支持 ("M1","M2","M3","M4")
 ch.set_speeds(50, -50, -50, 50)          # 1 帧 4 路
 ch.get_encoders()                         # (e1, e2, e3, e4)
 ch.stop()

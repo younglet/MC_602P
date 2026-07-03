@@ -5,12 +5,12 @@ import sys, os, time
 grandparent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, grandparent_dir)
 
-from mc602 import MC602, MultiMotors, SerialNotFoundError, ConnectionError
+from mc602 import MC602, Motors, SerialNotFoundError, ConnectionError
 
 
 def main():
     bot = MC602.connect()
-    mm = MultiMotors(bot, ports=(1, 2))  # M1, M2 only
+    mm = Motors(bot, ports=(1, 2))  # M1, M2 only
     with bot:
         print(f"{bot._port_name}, N=2 differential")
 

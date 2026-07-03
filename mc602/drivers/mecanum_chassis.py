@@ -1,7 +1,7 @@
 """
 mc602.drivers.mecanum_chassis — MecanumChassis
 
-Top-level: MultiMotors (RPC) + MecanumMotion (math).
+Top-level: Motors (RPC) + MecanumMotion (math).
 
     chassis = MecanumChassis(bot, ports=(3,1,4,2), track=30, base=28, r=3)
     chassis.move(vx=30, vy=0, omega=0.5)
@@ -11,7 +11,7 @@ Top-level: MultiMotors (RPC) + MecanumMotion (math).
 """
 
 from __future__ import annotations
-from .multi_motors import MultiMotors
+from .motors import Motors
 from ..motion.mecanum import MecanumMotion, WheelSpeeds, BodyVelocity, Pose2D
 
 
@@ -33,7 +33,7 @@ class MecanumChassis:
                  wheel_base: float = 28.0,
                  wheel_radius: float = 3.0,
                  encoder_ppr: int = 1):
-        self._chassis = MultiMotors(bot, ports)
+        self._chassis = Motors(bot, ports)
         self._motion = MecanumMotion(
             track=track, wheel_base=wheel_base,
             wheel_radius=wheel_radius, encoder_ppr=encoder_ppr,
@@ -75,5 +75,5 @@ class MecanumChassis:
         return self._motion
 
     @property
-    def chassis(self) -> MultiMotors:
+    def chassis(self) -> Motors:
         return self._chassis
