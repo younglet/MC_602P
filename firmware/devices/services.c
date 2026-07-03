@@ -368,6 +368,68 @@ static uint8_t motor_handler(uint8_t op, uint8_t inst, uint8_t prop,
 }
 
 /* ====================================================================
+ * Service: BT Remote (0x03) — 蓝牙手柄状态
+ *
+ * 读取蓝牙遥控器的摇杆值、按键、连接状态。
+ * inst 固定为 0。
+ *
+ * Props:
+ *   0x01 ALL  6×u8  R   [stick1:i8, stick2:i8, stick3:i8, stick4:i8, keys:u8, status:u8]
+ *   0x02 NAME str   R   蓝牙设备名
+ * ==================================================================== */
+
+static uint8_t btremote_handler(uint8_t op, uint8_t inst, uint8_t prop,
+                                 const uint8_t *in_data, uint8_t in_len,
+                                 uint8_t *out_data, uint8_t *out_len)
+{
+    (void)inst;
+    (void)in_data;
+    (void)in_len;
+
+    switch (op) {
+    case OP_GET:
+        switch (prop) {
+        case 0x01: { /* ALL: 4 sticks + keys + status, 11 bytes */
+            /* 摇杆值范围因手柄而异 (0-100 或 0-255 或 0-1023).
+             * 用 u16le 传输原值, 上位机自适应范围.
+             * 顺序: st1:u16 st2:u16 st3:u16 st4:u16 keys:u16 status:u8 */
+            for (int i = 0; i < 4; i++) {
+                int v = get_bt_remote_control(i + 1);  /* BTSTICK1=1 */
+                uint16_t uv = (uint16_t)(v < 0 ? 0 : v);
+                out_data[i * 2]     = (uint8_t)(uv & 0xFF);
+                out_data[i * 2 + 1] = (uint8_t)((uv >> 8) & 0xFF);
+            }
+            /* 按键: BTKEY=0, u16le (bit 0-15 全保留) */
+            int keys = get_bt_remote_control(0);
+            uint16_t uk = (uint16_t)(keys > 0 ? keys : 0);
+            out_data[8] = (uint8_t)(uk & 0xFF);
+            out_data[9] = (uint8_t)((uk >> 8) & 0xFF);
+            /* 连接状态 */
+            out_data[10] = (uint8_t)(getbtstatus() ? 1 : 0);
+            *out_len = 11;
+            return STATUS_OK;
+        }
+        case 0x02: { /* NAME */
+            char *name = getBtName();
+            uint8_t slen = 0;
+            if (name) {
+                slen = (uint8_t)strlen(name);
+                if (slen > 32) slen = 32;
+                memcpy(out_data + 1, name, slen);
+            }
+            out_data[0] = slen;
+            *out_len = 1 + slen;
+            return STATUS_OK;
+        }
+        default:
+            return STATUS_NOT_FOUND;
+        }
+    default:
+        return STATUS_NOT_FOUND;
+    }
+}
+
+/* ====================================================================
  * Service: Mecanum Group (0x02) — 4 路麦克纳姆轮组控
  *
  * 一次指令控制 M1~M4 全部四路, 避免逐路调用的串口延迟和时序不同步.
@@ -480,6 +542,7 @@ void rx_process_start(void)
     proto_service_register(0xFE, "System",  system_handler);
     proto_service_register(0x01, "Motor",   motor_handler);
     proto_service_register(0x02, "Mecanum", mecanum_group_handler);
+    proto_service_register(0x03, "BTRemote", btremote_handler);
 
     /* 启动 PID 控制线程 (200Hz, 5ms 周期) */
     ThreadStart(pid_control_loop);
