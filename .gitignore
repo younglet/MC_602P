@@ -1,0 +1,27 @@
+# ===== 编译产物 (build artifacts) =====
+firmware/build/Run.bin
+firmware/build/AT32Gcc.elf
+firmware/build/AT32Gcc.map
+firmware/build/objects.list
+firmware/build/obj/
+
+# mc602 部署包的 Run.bin (由 build_firmware.py --deploy 写入)
+mc602/tools/flash/Run.bin
+
+# ===== Python 缓存 =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# ===== IDE / 编辑器 =====
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ===== 系统文件 =====
+*.tmp
+*.bak
+errlog

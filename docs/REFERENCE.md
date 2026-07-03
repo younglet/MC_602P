@@ -1,6 +1,6 @@
 # MC_602P 完整参考手册
 
-> WhalesBot MC602P 机器人控制器 — GCC SDK 逆向分析与硬件映射
+> MC602 MC602P 机器人控制器 — GCC SDK 逆向分析与硬件映射
 >
 > 控制器芯片：AT32F403 (兼容 STM32F103ZE) | Cortex-M3 | 168MHz | FreeRTOS
 
