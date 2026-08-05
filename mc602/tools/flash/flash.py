@@ -83,14 +83,12 @@ def flash(bin_path: Path, address: int) -> int:
 
 # 槽位表 (与 mc602/comm/client.py SLOT_TABLE 一致)
 SLOT_TABLE = {
-    "A":    {"name": "GCC",    "addr": 0x0800D000},
-    "GUI":  {"name": "GUI",    "addr": 0x08040000},
-    "APP1": {"name": "APP1",   "addr": 0x08060000},
-    "APP2": {"name": "APP2",   "addr": 0x08080000},
-    "APP3": {"name": "APP3",   "addr": 0x08099000},
-    "APP4": {"name": "APP4",   "addr": 0x080B2000},
-    "APP5": {"name": "APP5",   "addr": 0x080CB000},
-    "APP6": {"name": "APP6",   "addr": 0x080E4000},
+    "A":    {"name": "RunA",   "addr": 0x0800D000},
+    "B":    {"name": "RunB",   "addr": 0x08060000},
+    "C":    {"name": "RunC",   "addr": 0x08080000},
+    "D":    {"name": "RunD",   "addr": 0x08099000},
+    "E":    {"name": "RunE",   "addr": 0x080B2000},
+    "F":    {"name": "RunF",   "addr": 0x080CB000},
 }
 
 
@@ -109,7 +107,7 @@ def main() -> int:
     parser.add_argument("--bin", type=Path, default=DEFAULT_BIN,
                         help=f"固件路径 (默认: {DEFAULT_BIN})")
     parser.add_argument("--slot", type=str, default="A",
-                        help="烧录槽位: A/GUI/APP1~APP6 (默认 A = GCC 0x0800D000)")
+                        help="烧录槽位: A~F (RunA~RunF, 默认 A = 主固件 0x0800D000)")
     parser.add_argument("--address", type=lambda s: int(s, 0), default=DEFAULT_ADDRESS,
                         help=f"目标地址 (默认: 0x{DEFAULT_ADDRESS:08X}, 与 --slot 二选一)")
     parser.add_argument("--rebuild", action="store_true",

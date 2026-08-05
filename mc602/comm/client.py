@@ -392,14 +392,12 @@ class MC602:
 #   app1~app6 = 应用程序槽
 # ====================================================================
 SLOT_TABLE = {
-    "A":    {"name": "GCC",    "addr": 0x0800D000, "bin": "Run.bin"},
-    "GUI":  {"name": "GUI",    "addr": 0x08040000, "bin": None},
-    "APP1": {"name": "APP1",   "addr": 0x08060000, "bin": None},
-    "APP2": {"name": "APP2",   "addr": 0x08080000, "bin": None},
-    "APP3": {"name": "APP3",   "addr": 0x08099000, "bin": None},
-    "APP4": {"name": "APP4",   "addr": 0x080B2000, "bin": None},
-    "APP5": {"name": "APP5",   "addr": 0x080CB000, "bin": None},
-    "APP6": {"name": "APP6",   "addr": 0x080E4000, "bin": None},
+    "A":    {"name": "RunA",   "addr": 0x0800D000, "bin": "Run.bin"},
+    "B":    {"name": "RunB",   "addr": 0x08060000, "bin": None},
+    "C":    {"name": "RunC",   "addr": 0x08080000, "bin": None},
+    "D":    {"name": "RunD",   "addr": 0x08099000, "bin": None},
+    "E":    {"name": "RunE",   "addr": 0x080B2000, "bin": None},
+    "F":    {"name": "RunF",   "addr": 0x080CB000, "bin": None},
 }
 
 
