@@ -271,7 +271,13 @@ static void chassis_control_loop(void)
             w  = g_ch.target_w;
             break;
         case CH_MODE_DIRECT: {
-            /* 固件直读摇杆: BTSTICK1=前后 BTSTICK2=横移 BTSTICK4=旋转 */
+            /* 固件直读摇杆: BTSTICK1=前后 BTSTICK2=横移 BTSTICK4=旋转
+             * 摇杆范围: 0~100 / 0~255 / 0~1023, 居中 = 满量程/2。
+             * 启动校准: 前 20 帧 (100ms) 采样平均 = 中心值。 */
+            static int calib_count = 0;
+            static long calib_sum = 0;
+            static int stick_center = 0;
+
             int s1 = get_bt_remote_control(BTSTICK1);
             int s2 = get_bt_remote_control(BTSTICK2);
             int s4 = get_bt_remote_control(BTSTICK4);
@@ -282,28 +288,22 @@ static void chassis_control_loop(void)
                 break;
             }
 
-            /* 自动标定满量程: 摇杆范围 0~100 / 0~255 / 0~1023 */
-            static int stick_scale = 0;
-            int max_abs = 0;
-            if (stick_scale == 0) {
-                max_abs = s1;
-                if (s2 > max_abs) max_abs = s2;
-                if (s4 > max_abs) max_abs = s4;
-                if (max_abs > 0) stick_scale = max_abs;
-            } else {
-                /* 定期重标定: 每次读到更大的值就更新 */
-                max_abs = s1;
-                if (s2 > max_abs) max_abs = s2;
-                if (s4 > max_abs) max_abs = s4;
-                if (max_abs > stick_scale) stick_scale = max_abs;
+            if (calib_count < 20) {
+                calib_sum += s1 + s2 + s4;
+                calib_count++;
+                stick_center = (int)(calib_sum / (calib_count * 3));
+                vx = 0.0f; vy = 0.0f; w = 0.0f;   /* 校准期间不动 */
+                break;
             }
-            if (stick_scale <= 0) stick_scale = 100;
+            if (stick_center < 10) {
+                stick_center = 100;   /* 异常兜底 */
+            }
 
             /* 摇杆 → -1.0~+1.0 (带死区) */
             float dz = (float)g_ch.direct_deadzone / 100.0f;
-            float f1 = (float)(s1 - stick_scale) / (float)stick_scale;
-            float f2 = (float)(s2 - stick_scale) / (float)stick_scale;
-            float f4 = (float)(s4 - stick_scale) / (float)stick_scale;
+            float f1 = (float)(s1 - stick_center) / (float)stick_center;
+            float f2 = (float)(s2 - stick_center) / (float)stick_center;
+            float f4 = (float)(s4 - stick_center) / (float)stick_center;
 
             if (fabsf(f1) < dz) f1 = 0.0f;
             if (fabsf(f2) < dz) f2 = 0.0f;
