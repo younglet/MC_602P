@@ -128,12 +128,13 @@ class MC602:
                 baudrate: int = DEFAULT_BAUDRATE,
                 timeout: float = DEFAULT_TIMEOUT,
                 auto_load: Optional[str] = "A",
-                auto_flash: bool = True) -> "MC602":
+                auto_flash: object = True) -> "MC602":
         """连接 MC602P。
 
         auto_load:  连接成功后自动执行的配置档名 (内置 "A" = 底盘默认参数;
                     None 禁用; 也支持 dict/callable, 见 load_profile)。
-        auto_flash: 固件无响应 (程序不对/没烧) 时自动烧录 Run.bin 并重连。
+        auto_flash: 固件无响应时自动烧录并重连。True/'a' = GCC 槽 (默认),
+                    也可指定 'gui'/'app1'..'app6' 槽位。False 禁用。
         """
         if port is None:
             port = find_ch340_port()
@@ -148,8 +149,9 @@ class MC602:
             bot._verify_firmware()
         except Exception:
             if auto_flash:
+                slot = "A" if auto_flash is True else str(auto_flash).upper()
                 bot.close()
-                _auto_flash(port)
+                _auto_flash(port, slot=slot)
                 bot = cls(port=port, baudrate=baudrate, timeout=timeout)
                 bot.open()
                 bot._verify_firmware()
@@ -383,22 +385,58 @@ class MC602:
         return list(resp.value)
 
 
-def _auto_flash(port: str) -> None:
-    """自动烧录: 用 pydownload 烧 mc602/tools/flash/Run.bin 并运行。"""
+# ====================================================================
+# Flash 槽位表 (MC602P)
+#   a     = GCC 用户程序槽 (默认, 我们的协议固件)
+#   gui   = 操作界面
+#   app1~app6 = 应用程序槽
+# ====================================================================
+SLOT_TABLE = {
+    "A":    {"name": "GCC",    "addr": 0x0800D000, "bin": "Run.bin"},
+    "GUI":  {"name": "GUI",    "addr": 0x08040000, "bin": None},
+    "APP1": {"name": "APP1",   "addr": 0x08060000, "bin": None},
+    "APP2": {"name": "APP2",   "addr": 0x08080000, "bin": None},
+    "APP3": {"name": "APP3",   "addr": 0x08099000, "bin": None},
+    "APP4": {"name": "APP4",   "addr": 0x080B2000, "bin": None},
+    "APP5": {"name": "APP5",   "addr": 0x080CB000, "bin": None},
+    "APP6": {"name": "APP6",   "addr": 0x080E4000, "bin": None},
+}
+
+
+def _resolve_slot(slot) -> dict:
+    """槽位解析: 'a'/'gui'/'app1'..'app6' → 槽位信息。默认 'a'。"""
+    key = str(slot).upper()
+    if key not in SLOT_TABLE:
+        raise ValueError(f"未知槽位: {slot}, 可用 {sorted(SLOT_TABLE)}")
+    return SLOT_TABLE[key]
+
+
+def _auto_flash(port: str, slot: str = "a", bin_path: Optional[str] = None) -> None:
+    """自动烧录: 用 pydownload 烧指定槽位。
+
+    slot:     槽位名 (默认 'a' = GCC 用户程序 0x0800D000)
+    bin_path: 固件文件 (默认 a 槽的 Run.bin)
+    """
     import importlib.util
     from pathlib import Path
-    import sys as _sys
 
+    slot_info = _resolve_slot(slot)
     flash_dir = Path(__file__).resolve().parent.parent / "tools" / "flash"
-    bin_path = flash_dir / "Run.bin"
-    if not bin_path.exists():
+    if bin_path is None:
+        bin_name = slot_info["bin"]
+        if bin_name is None:
+            raise FileNotFoundError(
+                f"槽位 {slot} 未配置默认固件, 请显式指定 bin_path")
+        bin_path = str(flash_dir / bin_name)
+    if not Path(bin_path).exists():
         raise FileNotFoundError(f"自动烧录失败: 找不到固件 {bin_path}")
     spec = importlib.util.spec_from_file_location(
         "pydownload", flash_dir / "pydownload.py")
     pd = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(pd)
 
-    print(f"[auto_flash] 固件无响应, 自动烧录 {bin_path} ...")
+    addr = slot_info["addr"]
+    print(f"[auto_flash] 固件无响应, 自动烧录 {bin_path} → 槽位 {slot} ({slot_info['name']} @0x{addr:08X}) ...")
     if not pd.ReadBin(str(bin_path)):
         raise ConnectionError(f"自动烧录失败: 读取固件失败 {bin_path}")
     ctype = 0
@@ -409,10 +447,12 @@ def _auto_flash(port: str) -> None:
         time.sleep(1.0)
     if ctype <= 0:
         raise ConnectionError(f"自动烧录失败: PING {port} 无响应 (检查 USB)")
-    if not pd.Download(port, 0x0800D000):
+    if not pd.Download(port, addr):
         raise ConnectionError("自动烧录失败: Download 错误")
-    pd.RunCode(port, 0x0800D000)
-    print("[auto_flash] 烧录完成, 固件已运行")
+    if addr == 0x0800D000:
+        pd.SaveNameToStm32(port, "RunA")
+    pd.RunCode(port, addr)
+    print(f"[auto_flash] 烧录完成, 槽位 {slot} 已运行")
 
 
 

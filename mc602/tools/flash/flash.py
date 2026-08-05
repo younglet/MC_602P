@@ -81,12 +81,37 @@ def flash(bin_path: Path, address: int) -> int:
     return result.returncode
 
 
+# 槽位表 (与 mc602/comm/client.py SLOT_TABLE 一致)
+SLOT_TABLE = {
+    "A":    {"name": "GCC",    "addr": 0x0800D000},
+    "GUI":  {"name": "GUI",    "addr": 0x08040000},
+    "APP1": {"name": "APP1",   "addr": 0x08060000},
+    "APP2": {"name": "APP2",   "addr": 0x08080000},
+    "APP3": {"name": "APP3",   "addr": 0x08099000},
+    "APP4": {"name": "APP4",   "addr": 0x080B2000},
+    "APP5": {"name": "APP5",   "addr": 0x080CB000},
+    "APP6": {"name": "APP6",   "addr": 0x080E4000},
+}
+
+
+def resolve_slot(slot: str) -> int:
+    key = slot.upper()
+    if key not in SLOT_TABLE:
+        print(f"[!] 未知槽位: {slot}, 可用 {sorted(SLOT_TABLE)}")
+        sys.exit(1)
+    info = SLOT_TABLE[key]
+    print(f"[flash] 槽位: {key} ({info['name']} @0x{info['addr']:08X})")
+    return info["addr"]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="一键烧录 MC602P 固件")
     parser.add_argument("--bin", type=Path, default=DEFAULT_BIN,
                         help=f"固件路径 (默认: {DEFAULT_BIN})")
+    parser.add_argument("--slot", type=str, default="A",
+                        help="烧录槽位: A/GUI/APP1~APP6 (默认 A = GCC 0x0800D000)")
     parser.add_argument("--address", type=lambda s: int(s, 0), default=DEFAULT_ADDRESS,
-                        help=f"目标地址 (默认: 0x{DEFAULT_ADDRESS:08X})")
+                        help=f"目标地址 (默认: 0x{DEFAULT_ADDRESS:08X}, 与 --slot 二选一)")
     parser.add_argument("--rebuild", action="store_true",
                         help="先 build + deploy, 再烧录")
     args = parser.parse_args()
@@ -95,13 +120,18 @@ def main() -> int:
     print(f"  MC602P 一键烧录")
     print("=" * 60)
 
+    # 槽位 → 地址 (--address 显式指定时优先)
+    address = args.address
+    if args.slot and args.address == DEFAULT_ADDRESS:
+        address = resolve_slot(args.slot)
+
     if args.rebuild:
         rebuild()
 
-    rc = flash(args.bin, args.address)
+    rc = flash(args.bin, address)
 
     if rc == 0:
-        print(f"\n[OK] 烧录完成。固件已跳到 0x{args.address:08X} 执行。")
+        print(f"\n[OK] 烧录完成。固件已跳到 0x{address:08X} 执行。")
     else:
         print(f"\n[!] 烧录失败 (returncode={rc})")
     return rc
