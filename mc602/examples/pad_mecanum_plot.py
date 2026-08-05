@@ -80,8 +80,9 @@ def main() -> int:
         print(f"[!] {e}")
         return 1
 
-    # 车默认在场地中央
-    car.reset_pose(FIELD_W / 2, FIELD_H / 2, 0.0)
+    # 车默认在场地中央 (固件里程计只支持归零, 绘图时平移偏移量)
+    car.reset_pose()
+    POSE_OFFSET = (FIELD_W / 2, FIELD_H / 2)
 
     # ── matplotlib setup ──────────────────────────────
     fig, ax = plt.subplots(figsize=(8, 8))
@@ -262,7 +263,9 @@ def main() -> int:
                 c, sn = math.cos(pose.theta), math.sin(pose.theta)
                 speed_mag = math.hypot(v[0], v[1])
 
-                traj_pts.append((pose.x, pose.y, speed_mag))
+                px = pose.x + POSE_OFFSET[0]
+                py = pose.y + POSE_OFFSET[1]
+                traj_pts.append((px, py, speed_mag))
                 pts = np.array(traj_pts, dtype=float)
                 if len(pts) >= 2:
                     seg_xy  = np.stack([pts[:-1, :2], pts[1:, :2]], axis=1)
@@ -270,15 +273,15 @@ def main() -> int:
                     traj_lines.set_segments(seg_xy)
                     traj_lines.set_array(seg_clr)
 
-                # 车体 (在 ax 坐标里, 不再在屏幕中央)
-                car_arrow.set_offsets([[pose.x, pose.y]])
+                # 车体 (固件里程计从 0,0 起, 平移到场中央)
+                car_arrow.set_offsets([[px, py]])
                 car_arrow.set_UVC(c * ARROW_LEN, sn * ARROW_LEN)
-                car_dot.set_data([pose.x], [pose.y])
+                car_dot.set_data([px], [py])
                 tail = 8.0
                 tx, ty = -sn * tail, c * tail
                 car_tail.set_data(
-                    [pose.x - tx, pose.x + tx],
-                    [pose.y - ty, pose.y + ty],
+                    [px - tx, px + tx],
+                    [py - ty, py + ty],
                 )
 
                 ax.set_title(
