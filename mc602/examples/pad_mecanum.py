@@ -117,7 +117,8 @@ def main() -> int:
             connected = s.connected if hasattr(s, "connected") else True
             status = "STOP" if stopped else ("BT-OFF" if not connected else "RUN")
             sys.stdout.write(
-                f"\r  btn=0x{btn:04X}  spd={speed:.1f}  {status}   "
+                f"\r  raw=({s.stick1:4d},{s.stick2:4d},{s.stick3:4d},{s.stick4:4d}) "
+                f"btn=0x{btn:04X} spd={speed:.1f} {status}   "
             )
             sys.stdout.flush()
             time.sleep(1.0 / LOOP_HZ)
