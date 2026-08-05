@@ -126,7 +126,15 @@ class MC602:
     @classmethod
     def connect(cls, port: Optional[str] = None,
                 baudrate: int = DEFAULT_BAUDRATE,
-                timeout: float = DEFAULT_TIMEOUT) -> "MC602":
+                timeout: float = DEFAULT_TIMEOUT,
+                auto_load: Optional[str] = "A",
+                auto_flash: bool = True) -> "MC602":
+        """连接 MC602P。
+
+        auto_load:  连接成功后自动执行的配置档名 (内置 "A" = 底盘默认参数;
+                    None 禁用; 也支持 dict/callable, 见 load_profile)。
+        auto_flash: 固件无响应 (程序不对/没烧) 时自动烧录 Run.bin 并重连。
+        """
         if port is None:
             port = find_ch340_port()
             if port is None:
@@ -135,8 +143,62 @@ class MC602:
                     "请确认 MC602P 已通过 USB 连接, 且 CH340 驱动已安装。"
                 )
         bot = cls(port=port, baudrate=baudrate, timeout=timeout)
-        bot.open()
+        try:
+            bot.open()
+            bot._verify_firmware()
+        except Exception:
+            if auto_flash:
+                bot.close()
+                _auto_flash(port)
+                bot = cls(port=port, baudrate=baudrate, timeout=timeout)
+                bot.open()
+                bot._verify_firmware()
+            else:
+                raise
+        if auto_load:
+            bot.load_profile(auto_load)
         return bot
+
+    def _verify_firmware(self) -> None:
+        """验证固件响应 (读 version, 失败抛 TimeoutError)。"""
+        self._request(Op.GET, 0xFE, 0, 0x02, timeout=1.0, retry=2)
+
+    def load_profile(self, profile) -> None:
+        """自动载入配置档。
+
+        profile: 内置档名 ("A" = 底盘默认参数) | dict | callable(bot)
+        """
+        if callable(profile):
+            profile(self)
+            return
+        if isinstance(profile, dict):
+            self._apply_geometry(profile)
+            return
+        if profile == "A":
+            self._apply_geometry({
+                "track": 30.0, "wheel_base": 28.0, "wheel_radius": 3.0,
+                "encoder_ppr": 2048, "roller_adjust": 1.052,
+                "max_v": 60.0, "max_w": 0.8,
+            })
+            return
+        raise ValueError(f"未知配置档: {profile}")
+
+    def _apply_geometry(self, cfg: dict) -> None:
+        """推送底盘几何 + 速度限制 (SVC 0x04)。"""
+        from ..services.mecanum import ChassisService
+        ch = ChassisService(self)
+        ch.set_geometry(
+            track=cfg["track"], wheel_base=cfg["wheel_base"],
+            wheel_radius=cfg["wheel_radius"],
+            encoder_ppr=cfg["encoder_ppr"],
+            roller_adjust=cfg.get("roller_adjust", 1.052),
+        )
+        if "max_v" in cfg or "max_w" in cfg:
+            ch.set_max_vel(
+                v_cm_s=cfg.get("max_v", 40.0),
+                w_deg_s=cfg.get("max_w", 90.0) * 180 / 3.14159,
+            )
+
 
     def open(self) -> None:
         if self._ser is not None:
@@ -319,6 +381,39 @@ class MC602:
         self._send_frame(payload)
         resp = self._await_response(seq, timeout)
         return list(resp.value)
+
+
+def _auto_flash(port: str) -> None:
+    """自动烧录: 用 pydownload 烧 mc602/tools/flash/Run.bin 并运行。"""
+    import importlib.util
+    from pathlib import Path
+    import sys as _sys
+
+    flash_dir = Path(__file__).resolve().parent.parent / "tools" / "flash"
+    bin_path = flash_dir / "Run.bin"
+    if not bin_path.exists():
+        raise FileNotFoundError(f"自动烧录失败: 找不到固件 {bin_path}")
+    spec = importlib.util.spec_from_file_location(
+        "pydownload", flash_dir / "pydownload.py")
+    pd = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(pd)
+
+    print(f"[auto_flash] 固件无响应, 自动烧录 {bin_path} ...")
+    if not pd.ReadBin(str(bin_path)):
+        raise ConnectionError(f"自动烧录失败: 读取固件失败 {bin_path}")
+    ctype = 0
+    for attempt in range(3):
+        ctype = pd.PingControl(port)
+        if ctype > 0:
+            break
+        time.sleep(1.0)
+    if ctype <= 0:
+        raise ConnectionError(f"自动烧录失败: PING {port} 无响应 (检查 USB)")
+    if not pd.Download(port, 0x0800D000):
+        raise ConnectionError("自动烧录失败: Download 错误")
+    pd.RunCode(port, 0x0800D000)
+    print("[auto_flash] 烧录完成, 固件已运行")
+
 
 
 __all__ = ["MC602", "find_ch340_port", "CH340_VID", "CH340_PID_PRIMARY", "CH340_PID_ALT"]

@@ -36,7 +36,7 @@ WHEEL_BASE = 28.0        # 轴距 cm
 WHEEL_RADIUS = 3.0       # 轮半径 cm
 ENCODER_PPR = 2048       # 编码器 PPR
 MAX_V = 60.0             # 最大线速度 cm/s
-MAX_W = 1.5              # 最大角速度 rad/s
+MAX_W = 0.8              # 最大角速度 rad/s (~46°/s, 遥控细腻; Shift 加速×1.5)
 FAST_MULT = 1.5          # Shift 加速倍率
 LOOP_HZ = 20             # 控制/推流频率
 PORT = 8000
@@ -84,6 +84,14 @@ def control_loop(car):
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
+
+    def handle(self):
+        """全局兜底: 客户端断连 (手机/平板关页/切后台) 不刷 traceback"""
+        try:
+            super().handle()
+        except (ConnectionAbortedError, ConnectionResetError,
+                BrokenPipeError, TimeoutError, OSError):
+            pass
 
     def do_GET(self):
         if self.path == "/" or self.path == "/index.html":
@@ -181,55 +189,72 @@ PAGE = r"""<!DOCTYPE html>
 <script>
 const FIELD_W = """ + str(FIELD_W) + """, FIELD_H = """ + str(FIELD_H) + """;
 const MAX_V = """ + str(MAX_V) + """, MAX_W = """ + str(MAX_W) + """;
-const canvas = document.getElementById('map'), ctx = canvas.getContext('2d');
+const canvas = document.getElementById('map');
+const DPR = Math.min(2, devicePixelRatio || 1);
+const fctx = canvas.getContext('2d');
+// 离屏背景层: 场地 + 轨迹 (只在更新时重绘)
+const bg = document.createElement('canvas');
+const bctx = bg.getContext('2d');
 
 // ── 视野 ──
 let view = { cx: FIELD_W/2, cy: FIELD_H/2, scale: 2.2 };
 function resize() {
-  canvas.width = canvas.clientWidth * devicePixelRatio;
-  canvas.height = canvas.clientHeight * devicePixelRatio;
-  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  canvas.width = canvas.clientWidth * DPR;
+  canvas.height = canvas.clientHeight * DPR;
+  fctx.setTransform(DPR,0,0,DPR,0,0);
+  bg.width = canvas.width; bg.height = canvas.height;
+  bctx.setTransform(DPR,0,0,DPR,0,0);
+  drawBackground();
 }
 window.addEventListener('resize', resize); resize();
 
-// 世界坐标 → 屏幕
 function toScreen(x, y) {
   return [(x - view.cx) * view.scale + canvas.clientWidth/2,
           (y - view.cy) * view.scale + canvas.clientHeight/2];
 }
 
-// ── 轨迹 ──
+// ── 背景层: 场地 + 全部轨迹 (视野变化/新点时重绘) ──
 const traj = [];            // {x, y, speed}
-function draw() {
-  ctx.clearRect(0,0,canvas.clientWidth,canvas.clientHeight);
-
-  // 场地
+function drawBackground() {
+  bctx.clearRect(0,0,canvas.clientWidth,canvas.clientHeight);
   const [sx, sy] = toScreen(0,0), [ex, ey] = toScreen(FIELD_W, FIELD_H);
-  ctx.strokeStyle = '#9e9e9e'; ctx.lineWidth = 2;
-  ctx.strokeRect(sx, sy, ex-sx, ey-sy);
-  ctx.fillStyle = '#5b6472'; ctx.font = '12px monospace';
-  ctx.fillText('0,0', sx+6, sy+16); ctx.fillText(FIELD_W+','+FIELD_H, ex-70, ey-6);
-
-  // 轨迹 (速度色阶: 红→黄→绿)
+  bctx.strokeStyle = '#9e9e9e'; bctx.lineWidth = 2;
+  bctx.strokeRect(sx, sy, ex-sx, ey-sy);
+  bctx.fillStyle = '#5b6472'; bctx.font = '12px monospace';
+  bctx.fillText('0,0', sx+6, sy+16); bctx.fillText(FIELD_W+','+FIELD_H, ex-70, ey-6);
   for (let i = 1; i < traj.length; i++) {
     const a = traj[i-1], b = traj[i];
     const t = Math.min(1, Math.abs(b.speed) / MAX_V);
-    ctx.strokeStyle = `rgb(${255-200*t},${80+170*t},${80})`;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
+    bctx.strokeStyle = `rgb(${255-200*t},${80+170*t},${80})`;
+    bctx.lineWidth = 2;
+    bctx.beginPath();
     const [ax,ay] = toScreen(a.x,a.y), [bx,by] = toScreen(b.x,b.y);
-    ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
+    bctx.moveTo(ax,ay); bctx.lineTo(bx,by); bctx.stroke();
   }
+}
 
-  // 车体
+// 新轨迹段: 只追加画一段 (不重绘全部)
+function appendTraj(x1, y1, x2, y2, speed) {
+  const t = Math.min(1, Math.abs(speed) / MAX_V);
+  bctx.strokeStyle = `rgb(${255-200*t},${80+170*t},${80})`;
+  bctx.lineWidth = 2;
+  bctx.beginPath();
+  const [ax,ay] = toScreen(x1,y1), [bx,by] = toScreen(x2,y2);
+  bctx.moveTo(ax,ay); bctx.lineTo(bx,by); bctx.stroke();
+}
+
+// ── 前景层: 车体 (每帧只画几笔, 轻量) ──
+function draw() {
+  fctx.clearRect(0,0,canvas.clientWidth,canvas.clientHeight);
+  fctx.drawImage(bg, 0, 0, canvas.clientWidth, canvas.clientHeight);
   const p = lastPose;
   const [px, py] = toScreen(p.x, p.y);
-  ctx.save(); ctx.translate(px, py); ctx.rotate(p.theta);
-  ctx.strokeStyle = '#ff5252'; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.moveTo(18,0); ctx.lineTo(-10,0); ctx.stroke();  // 箭头
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath(); ctx.arc(0,0,5,0,7); ctx.fill();
-  ctx.restore();
+  fctx.save(); fctx.translate(px, py); fctx.rotate(p.theta);
+  fctx.strokeStyle = '#ff5252'; fctx.lineWidth = 3;
+  fctx.beginPath(); fctx.moveTo(18,0); fctx.lineTo(-10,0); fctx.stroke();
+  fctx.fillStyle = '#ffffff';
+  fctx.beginPath(); fctx.arc(0,0,5,0,7); fctx.fill();
+  fctx.restore();
   requestAnimationFrame(draw);
 }
 
@@ -268,6 +293,7 @@ canvas.addEventListener('wheel', e => {
   view.scale *= (e.deltaY < 0 ? 1.2 : 1/1.2);
   view.scale = Math.max(0.5, Math.min(20, view.scale));
   view.cx = wx - mx / view.scale; view.cy = wy - my / view.scale;
+  drawBackground();
 }, {passive:false});
 
 let drag = null;
@@ -277,20 +303,27 @@ window.addEventListener('mousemove', e => {
   view.cx -= (e.clientX - drag.x) / view.scale;
   view.cy -= (e.clientY - drag.y) / view.scale;
   drag = {x:e.clientX, y:e.clientY};
+  drawBackground();
 });
 window.addEventListener('mouseup', () => drag = null);
 canvas.addEventListener('dblclick', () => {
   view.cx = FIELD_W/2; view.cy = FIELD_H/2; view.scale = 2.2;
+  drawBackground();
 });
 
 // ── SSE 接收 ──
 let lastPose = {x:0, y:0, theta:0};
 const es = new EventSource('/events');
+let lastTraj = null;
 es.onmessage = e => {
   const d = JSON.parse(e.data);
+  const prev = lastPose;
   lastPose = d.pose;
-  traj.push({x:d.pose.x, y:d.pose.y, speed:0});
-  if (traj.length > 1500) traj.shift();
+  const pt = {x:d.pose.x, y:d.pose.y, speed:0};
+  traj.push(pt);
+  if (traj.length > 800) traj.shift();
+  if (lastTraj) appendTraj(lastTraj.x, lastTraj.y, pt.x, pt.y, 0);
+  lastTraj = pt;
   const el = document.getElementById('status');
   const th = (d.pose.theta*180/Math.PI).toFixed(1);
   el.innerHTML = `<span class="${d.status==='ok'?'ok':'err'}">${d.status==='ok'?'在线':'通信异常'}</span><br>
