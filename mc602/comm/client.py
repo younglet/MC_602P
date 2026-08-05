@@ -127,14 +127,14 @@ class MC602:
     def connect(cls, port: Optional[str] = None,
                 baudrate: int = DEFAULT_BAUDRATE,
                 timeout: float = DEFAULT_TIMEOUT,
-                auto_load: Optional[str] = "A",
-                auto_flash: object = True) -> "MC602":
+                auto_load: bool = True,
+                auto_flash: bool = True) -> "MC602":
         """连接 MC602P。
 
-        auto_load:  连接成功后自动执行的配置档名 (内置 "A" = 底盘默认参数;
-                    None 禁用; 也支持 dict/callable, 见 load_profile)。
-        auto_flash: 固件无响应时自动烧录并重连。True/'a' = GCC 槽 (默认),
-                    也可指定 'gui'/'app1'..'app6' 槽位。False 禁用。
+        auto_load:  True (默认) 连接后自动载入默认底盘参数;
+                    False 不载入。自定义配置用 load_profile()。
+        auto_flash: True (默认) 固件无响应时自动烧录 A 槽并重连;
+                    False 禁用。
         """
         if port is None:
             port = find_ch340_port()
@@ -149,16 +149,15 @@ class MC602:
             bot._verify_firmware()
         except Exception:
             if auto_flash:
-                slot = "A" if auto_flash is True else str(auto_flash).upper()
                 bot.close()
-                _auto_flash(port, slot=slot)
+                _auto_flash(port, slot="A")
                 bot = cls(port=port, baudrate=baudrate, timeout=timeout)
                 bot.open()
                 bot._verify_firmware()
             else:
                 raise
         if auto_load:
-            bot.load_profile(auto_load)
+            bot.load_profile("A")
         return bot
 
     def _verify_firmware(self) -> None:
