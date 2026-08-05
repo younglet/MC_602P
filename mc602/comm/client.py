@@ -36,6 +36,7 @@ from ..services.stepper import StepperService
 from ..services.servo import ServoBusService, ServoPWMService
 from ..services.mecanum import ChassisService
 from ..services.io import IOService
+from ..services.lcd import LCDService
 from ..drivers.btpad import BTPad
 from .packet import (
     Op,
@@ -112,6 +113,7 @@ class MC602:
         self.servo_pwm = ServoPWMService(self)
         self.chassis = ChassisService(self)
         self.io = IOService(self)
+        self.lcd = LCDService(self)
         self.pad = BTPad(self)
 
     def __enter__(self) -> "MC602":
@@ -156,6 +158,15 @@ class MC602:
             target=self._reader_loop, name="MC602Reader", daemon=True
         )
         self._reader_thread.start()
+
+        # 链路预热握手: 板子 USB/复位特性导致"连接后第一个请求偶发超时",
+        # open 后立即发一次 GET version 稳定链路 (失败重试, 不阻断)。
+        for _ in range(3):
+            try:
+                self._request(Op.GET, 0xFE, 0, 0x02, timeout=1.0, retry=1)
+                break
+            except Exception:
+                time.sleep(0.3)
 
     def close(self) -> None:
         if self._ser is None:
@@ -241,11 +252,12 @@ class MC602:
     def _request(self, op: Op, svc: int, inst: int, prop: int,
                  value: bytes = b"",
                  timeout: float = 2.0,
-                 retry: int = 0,
+                 retry: int = 1,
                  retry_delay: float = 0.1) -> Payload:
         """发送一帧请求, 等待响应, 可选自动重试.
 
-        retry: 超时后额外重试次数 (0=不发重试).
+        retry: 超时后额外重试次数 (默认 1 — 心跳刷屏的 SPI 窗口会丢帧,
+        重发即成功).
         retry_delay: 重试前等待秒数, 给固件 UART handler 喘息窗口.
         """
         last_err = None

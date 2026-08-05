@@ -19,6 +19,7 @@ from .drivers.system import System
 from .drivers.stepper import Stepper
 from .drivers.servo import Servo485, ServoPWM
 from .drivers.io import DigitalOutput, AnalogInput, PWM
+from .drivers.lcd import Lcd
 from .comm.exceptions import SerialNotFoundError
 
 
@@ -65,6 +66,11 @@ class Robot:
     def pwm(self, port) -> PWM:
         """通用 PWM 实例 ("D1"~"D7")。⚠️ 与同口 DigitalOutput 互斥。"""
         return PWM(self._bot, port)
+
+    @property
+    def lcd(self) -> Lcd:
+        """屏幕显示 (单例)。"""
+        return Lcd(self._bot)
 
     @property
     def system(self) -> System:

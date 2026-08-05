@@ -59,8 +59,14 @@ static void on_critical_battery(void* ctx, const SystemStatus* status, uint8_t f
 
 static uint32_t now_ms(void) { return (uint32_t)(seconds() * 1000.0f); }
 
+/* LCD service 占用标志: 上位机写屏后置 1, 心跳不再刷新屏幕 */
+extern volatile uint8_t lcd_user_active;
+/* LCD 命令由主循环执行 (协议线程只写队列) */
+extern int lcd_service_poll(void);
+
 static void render_lcd(void)
 {
+    if (lcd_user_active) return;   /* 屏幕已交给上位机 */
     if (!g_sys) return;
     const SystemStatus* st = system_service_get_status(g_sys);
     if (!st) return;
@@ -118,7 +124,9 @@ void user_main(void)
         }
 
         uint32_t now = now_ms();
-        if (now - last_lcd >= 500) {
+        if (lcd_service_poll()) {
+            last_lcd = now;   /* 用户命令刚刷屏, 跳过本轮心跳渲染 */
+        } else if (now - last_lcd >= 500) {
             last_lcd = now;
             g_spinner_index++;
             render_lcd();

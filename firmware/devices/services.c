@@ -1037,6 +1037,118 @@ static uint8_t io_handler(uint8_t op, uint8_t inst, uint8_t prop,
 }
 
 /* ====================================================================
+ * Service: LCD (0x60) — 屏幕显示
+ *
+ * 上位机写屏后自动停用心跳的 LCD 刷新 (lcd_user_active)。
+ * user_main.c 的 render_lcd() 检查该标志。
+ *
+ * Commands:
+ *   0x80 show_line   [u8 line(1~5)][str text ≤20 字符]
+ *   0x81 clear       — 清屏
+ *   0x82 clear_line  [u8 line(1~5)]
+ *   0x83 auto        — 恢复心跳自动刷新
+ * ==================================================================== */
+
+volatile uint8_t lcd_user_active = 0;   /* user_main.c 引用 */
+
+/* LCD 命令队列: 协议线程只写命令, 主循环执行显示 (单线程访问 LCD) */
+volatile uint8_t  lcd_cmd_pending = 0;
+volatile uint8_t  lcd_cmd_type   = 0;   /* 1=show_line 2=clear 3=clear_line */
+volatile uint8_t  lcd_cmd_line   = 0;
+char              lcd_cmd_text[21];
+
+static uint8_t lcd_handler(uint8_t op, uint8_t inst, uint8_t prop,
+                           const uint8_t *in_data, uint8_t in_len,
+                           uint8_t *out_data, uint8_t *out_len)
+{
+    (void)inst;
+
+    switch (op) {
+    case OP_CALL:
+        switch (prop) {
+        case 0x80: { /* show_line */
+            if (in_len < 2) return STATUS_RANGE_ERR;
+            uint8_t line = in_data[0];
+            if (line < 1 || line > 5) return STATUS_RANGE_ERR;
+            uint8_t n = in_len - 1;
+            if (n > 20) n = 20;
+            memset(lcd_cmd_text, 0, sizeof(lcd_cmd_text));
+            memcpy(lcd_cmd_text, in_data + 1, n);
+            lcd_cmd_line = line;
+            lcd_cmd_type = 1;
+            lcd_cmd_pending = 1;
+            lcd_user_active = 1;   /* 心跳停止刷新 */
+            *out_len = 0;
+            return STATUS_OK;
+        }
+        case 0x81: /* clear */
+            lcd_cmd_type = 2;
+            lcd_cmd_pending = 1;
+            lcd_user_active = 1;
+            *out_len = 0;
+            return STATUS_OK;
+        case 0x82: { /* clear_line */
+            if (in_len < 1) return STATUS_RANGE_ERR;
+            uint8_t line = in_data[0];
+            if (line < 1 || line > 5) return STATUS_RANGE_ERR;
+            lcd_cmd_line = line;
+            lcd_cmd_type = 3;
+            lcd_cmd_pending = 1;
+            lcd_user_active = 1;
+            *out_len = 0;
+            return STATUS_OK;
+        }
+        case 0x83: /* auto — 恢复心跳刷新 (重画标题行) */
+            lcd_cmd_type = 4;
+            lcd_cmd_pending = 1;
+            lcd_user_active = 0;
+            *out_len = 0;
+            return STATUS_OK;
+        default:
+            return STATUS_NOT_FOUND;
+        }
+
+    default:
+        return STATUS_NOT_FOUND;
+    }
+}
+
+/* 主循环调用: 执行挂起的 LCD 命令 (返回 1 表示已处理) */
+int lcd_service_poll(void)
+{
+    if (!lcd_cmd_pending) return 0;
+    lcd_cmd_pending = 0;
+
+    if (lcd_cmd_type == 4) {
+        /* 恢复心跳模式: 重画标题/分隔线 (3/4/5 行由 render_lcd 自动更新) */
+        show(1, "%s", "MC602P smartcar");
+        show(2, "%s", "------------------");
+        LCD_Ram2LCD();
+        return 1;
+    }
+
+    /* 首次用户命令: 清空心跳残留 (5 行 × 20 空格覆盖缓冲, 再整体刷屏) */
+    for (int l = 1; l <= 5; l++) {
+        show(l, "%s", "                    ");
+    }
+
+    switch (lcd_cmd_type) {
+    case 1: /* show_line */
+        show(lcd_cmd_line, "%s", lcd_cmd_text);
+        break;
+    case 2: /* clear */
+        break;
+    case 3: /* clear_line */
+        show(lcd_cmd_line, "%s", "                    ");
+        break;
+    default:
+        break;
+    }
+    LCD_Ram2LCD();
+    return 1;
+}
+
+/* ====================================================================
  * 初始化
  * ==================================================================== */
 
@@ -1057,6 +1169,7 @@ void rx_process_start(void)
     proto_service_register(0x21, "ServoPWM", servopwm_handler);
     proto_service_register(0x04, "Chassis", chassis_handler);
     proto_service_register(0x50, "IO", io_handler);
+    proto_service_register(0x60, "LCD", lcd_handler);
 
     /* PWM 舵机: 初始化定时器 + 打开舵机电源 */
     ServoInit();

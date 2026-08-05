@@ -10,8 +10,9 @@ from .stepper import StepperService
 from .servo import ServoBusService, ServoPWMService
 from .mecanum import ChassisService
 from .io import IOService
+from .lcd import LCDService
 
 __all__ = ["MotorService", "SystemService",
            "MotorsService", "BTPadService", "StepperService",
            "ServoBusService", "ServoPWMService", "ChassisService",
-           "IOService"]
+           "IOService", "LCDService"]

@@ -55,12 +55,14 @@ from .services.stepper import StepperService
 from .services.servo import ServoBusService, ServoPWMService
 from .services.mecanum import ChassisService
 from .services.io import IOService
+from .services.lcd import LCDService
 from .drivers.btpad import BTPad, BTPadState
 from .drivers.motors import Motors
 from .drivers.mecanum_chassis import MecanumChassis, Pose2D
 from .drivers.stepper import Stepper
 from .drivers.servo import Servo485, ServoPWM
 from .drivers.io import DigitalOutput, AnalogInput, PWM
+from .drivers.lcd import Lcd
 
 # 端口常量
 from .drivers.constants import (
@@ -99,6 +101,7 @@ __all__ = [
     "Servo485", "ServoPWM", "ServoBusService", "ServoPWMService",
     "ChassisService", "Pose2D",
     "IOService", "DigitalOutput", "AnalogInput", "PWM",
+    "LCDService", "Lcd",
     # 异常
     "MC602Error", "WhalesBotError",
     "ConnectionError", "ProtocolError", "TimeoutError",
