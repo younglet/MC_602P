@@ -159,8 +159,9 @@ typedef struct {
     uint8_t max_speed_cmd;  /* 喂 set_motor 的上限, 5~100 */
 
     /* 超时 */
-    uint32_t timeout_ms;
+    uint32_t timeout_ms;        /* GOTO 移动超时 */
     uint32_t move_start_ms;
+
 
     /* 统计 */
     uint32_t distance_cm_x100;     /* 总里程 (cm ×100) */

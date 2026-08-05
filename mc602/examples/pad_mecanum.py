@@ -23,7 +23,7 @@ sys.path.insert(0, grandparent_dir)
 from mc602 import (MC602, MecanumChassis,
                     SerialNotFoundError, ConnectionError)
 
-LOOP_HZ     = 10
+LOOP_HZ     = 20
 MAX_SPEED   = 60.0     # cm/s, 摇杆推到底对应的车身速度
 MAX_OMEGA   = 0.8      # rad/s, 摇杆推到底对应的旋转角速度 (~46°/s)
 SPEED_FAST  = 1.0      # L1 倍率
@@ -80,7 +80,6 @@ def main() -> int:
         speed = 1.0
         prev_btn = 0
         stopped = False
-        last_v = (0.0, 0.0, 0.0)
 
         while True:
             try:
@@ -115,12 +114,11 @@ def main() -> int:
                 strafe  = bot.pad._deadzone(s.stick2, c2, dz) * MAX_SPEED * speed
                 rot     = bot.pad._deadzone(s.stick4, c4, dz) * MAX_OMEGA * speed
                 v = (fwd, strafe, rot)
-                if v != last_v:
-                    last_v = v
-                    try:
-                        car.move(*v)
-                    except Exception:
-                        pass
+                # 周期必发: 摇杆不动也持续下发, 避免丢帧导致命令丢失
+                try:
+                    car.move(*v)
+                except Exception:
+                    pass
             else:
                 v = (0.0, 0.0, 0.0)
 

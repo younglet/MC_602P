@@ -55,7 +55,7 @@ class ChassisService:
     PROP_TOL_ANG = 0x27  # u16 deg×10
     PROP_MAX_V = 0x28    # u16 cm/s
     PROP_MAX_W = 0x29    # u16 deg/s
-    PROP_TIMEOUT = 0x30  # u16 ms
+    PROP_TIMEOUT = 0x30  # u16 ms (GOTO 移动超时)
 
     # CALL commands
     CALL_GOTO = 0x80     # i32×3 + u8 max_speed
@@ -208,3 +208,4 @@ class ChassisService:
             Op.SET, self.SVC, 0, self.PROP_TIMEOUT,
             value=int(ms).to_bytes(2, "little"),
         )
+
