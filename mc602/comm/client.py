@@ -32,6 +32,10 @@ from .exceptions import (
 )
 from ..services.motor import MotorService
 from ..services.system import SystemService
+from ..services.stepper import StepperService
+from ..services.servo import ServoBusService, ServoPWMService
+from ..services.mecanum import ChassisService
+from ..services.io import IOService
 from ..drivers.btpad import BTPad
 from .packet import (
     Op,
@@ -103,6 +107,11 @@ class MC602:
         # 子 API
         self.system  = SystemService(self)
         self.motor   = MotorService(self)
+        self.stepper = StepperService(self)
+        self.servo_bus = ServoBusService(self)
+        self.servo_pwm = ServoPWMService(self)
+        self.chassis = ChassisService(self)
+        self.io = IOService(self)
         self.pad = BTPad(self)
 
     def __enter__(self) -> "MC602":

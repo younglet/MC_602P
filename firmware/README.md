@@ -168,8 +168,9 @@ payload:
 |---------|----|------|------|
 | System | 0xFE | `devices/system_monitor.c` | ✅ 已实现 |
 | Motor | 0x01 | `devices/services.c::motor_handler` | ✅ 已实现 |
-| ServoBus | 0x20 | — | ❌ TODO |
-| Stepper | 0x30 | — | ❌ TODO |
+| Stepper | 0x30 | `devices/services.c::stepper_handler` (SDK `step_driver.c`) | ✅ 已实现 |
+| ServoBus | 0x20 | `devices/services.c::servobus_handler` (485, 经 step_driver) | ✅ 已实现 |
+| ServoPWM | 0x21 | `devices/services.c::servopwm_handler` (P7~P13) | ✅ 已实现 |
 | Sensor (ToF/Color/IMU) | 0x40+ | — | ❌ TODO |
 
 完整协议参考：[docs/FIRMWARE.md §2](../docs/FIRMWARE.md)
@@ -221,6 +222,50 @@ payload:
 | 0x80 stop (CALL) | - | - | 停电机 |
 | 0x81 reset_encoder (CALL) | - | - | 复位编码器 |
 | 0x82 move_to (CALL) | - | - | 位置闭环 (i32 pos + u8 max_speed) |
+
+---
+
+### 7.3 Stepper Service (svc=0x30)
+
+底层为 SDK `step_driver.c` (自带 100Hz 加减速线程, 3 通道 485 总线)。
+`inst` = 通道 (1~3, 即 `STP_MOT_CH1~3`)。
+
+| Prop | 访问 | 类型 | 含义 |
+|------|------|------|------|
+| 0x01 speed | rw | i16 | 目标速度 (-32000~32000, \|v\|<50 视为 0) |
+| 0x02 distance | r | i32 | 驱动器反馈累计脉冲 |
+| 0x03 acc | rw | u16 | 加减速 (0~32000, 默认 1000) |
+| 0x80 stop (CALL) | - | - | 速度置 0 (保持力矩) |
+| 0x81 reset (CALL) | - | - | 复位/释放 (阻塞 ~100ms) |
+
+> ⚠️ reset 在协议线程内忙等 100ms, 期间响应延迟, 上位机自动重试兜底。
+> 速度/acc 的 GET 返回固件侧最近一次 SET 记录 (SDK 无 getter)。
+
+### 7.4 ServoBus Service (svc=0x20) — 485 总线舵机
+
+底层经 SDK `step_driver.c` 的 `set_step_servoa()` 发送 (与步进电机共用 485 总线,
+由 StepMotorThread 统一仲裁, 官方共存方案)。`inst` = 舵机 ID (S1~S18)。
+
+| Prop/命令 | 访问 | 类型 | 含义 |
+|------|------|------|------|
+| 0x01 angle | r | i16 | 最近一次目标角度 (-150~150) |
+| 0x80 set_angle (CALL) | - | - | [i16 angle][u8 speed] 阻塞 ≤10ms |
+
+> ⚠️ 其余 485 舵机 API (set_servo_angle/读角度/力矩) 会抢占
+> `setUartPort485_RxHandle` 与步进线程冲突, 不启用。首次调用会触发
+> 步进线程启动 (set_stepmotor 速度 0, 不影响电机)。
+
+### 7.5 ServoPWM Service (svc=0x21) — PWM 舵机
+
+底层 SDK `SetServo()` (独立定时器, 与步进/485 无冲突)。
+`inst` = 1~7 → D1~D7 (P7~P13)。
+
+| Prop/命令 | 访问 | 类型 | 含义 |
+|------|------|------|------|
+| 0x01 angle | r | i16 | 最近一次目标角度 (0~180) |
+| 0x80 set_angle (CALL) | - | - | [u16 angle][u8 speed(10~100)] |
+
+> 初始化: `rx_process_start` 调 `ServoInit()` + `SERVO_PWR_ON()`。
 
 ---
 
@@ -276,9 +321,15 @@ printf("hello");  // ❌ 出现在 LCD，不是终端！
 
 ### P1: 加新 Service
 
-- [ ] Servo (0x20) — 总线舵机（RS485）
-- [ ] Stepper (0x30) — 步进电机
+- [x] Servo (0x20) — 总线舵机（RS485, 经 step_driver 共存）✅
+- [x] ServoPWM (0x21) — PWM 舵机 (P7~P13) ✅
+- [x] Stepper (0x30) — 步进电机 ✅ (SDK step_driver)
 - [ ] Sensor (0x40+) — ToF / 颜色 / IMU
+
+> 注意: 步进与 485 舵机共用总线 + 单 RX 回调。`setUartPort485_RxHandle`
+> 每 10ms 被 StepMotorThread 重新注册。若需独立 485 舵机 API
+> (读角度/力矩/旋转模式), 需统一总线仲裁 (即 build 注释里缺失的
+> "新版 step_driver / servo_bus_* API")。
 
 ### P2: 应用层
 

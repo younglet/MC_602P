@@ -47,6 +47,7 @@ python mc602/examples/test_m1.py
 | 6 层架构 / 加新 device 模板 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | 烧录 / 状态机 / PING / 常见坑 | [docs/FIRMWARE.md](docs/FIRMWARE.md) |
 | GPIO / 端口 / 内存 / SDK API 字典 | [docs/REFERENCE.md](docs/REFERENCE.md) |
+| 端口定义 (P1~P6/AI/D1~D7 映射) | [docs/PORTS.md](docs/PORTS.md) |
 | 336 个硬件 API 真值表 | [docs/hardware_api.csv](docs/hardware_api.csv) |
 | 固件使用 / 编译 / LCD / Service 状态 | [firmware/README.md](firmware/README.md) |
 | 上位机 SDK / per-instance OOP | [host/README.md](host/README.md) |

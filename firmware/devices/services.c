@@ -18,6 +18,7 @@
 #include "services.h"
 #include "dispatcher.h"
 #include "motor_pid.h"
+#include "chassis.h"
 #include <string.h>
 
 /* ====================================================================
@@ -25,6 +26,9 @@
  * ==================================================================== */
 
 #define MOTOR_MAX 6
+
+/* 485 总线独占标志 (定义在 step_driver.c, 自研扩展) */
+extern volatile int step_bus_busy;
 
 /* ====================================================================
  * PID 控制循环 (5ms 周期, 200Hz)
@@ -528,6 +532,511 @@ static uint8_t mecanum_group_handler(uint8_t op, uint8_t inst, uint8_t prop,
 }
 
 /* ====================================================================
+ * Service: Stepper (0x30) — 485 总线步进电机
+ *
+ * 底层: SDK step_driver (step_driver.c) — 自带 100Hz 线程:
+ *   - 3 通道梯形加减速 + 速度写寄存器 (一帧广播 3 通道)
+ *   - 距离反馈解析 (cmd 0x90/0x91/0x92)
+ *   - |speed| < 50 视为 0 (低速死区, SDK 行为)
+ *
+ * inst = 通道 (1~3), 对应 STP_MOT_CH1~CH3.
+ *
+ * Props:
+ *   0x01 speed     i16 rw  目标速度 (-32000~32000)
+ *   0x02 distance  i32 r   脉冲距离 (驱动器反馈)
+ *   0x03 acc       u16 rw  加减速 (0~32000, 默认 1000, 越大加速越快)
+ * Commands:
+ *   0x80 stop      — 速度置 0 (保持力矩, 不清距离)
+ *   0x81 reset     — 复位/释放 (速度 0 + Servo_Reset, 阻塞 ~100ms)
+ *
+ * ⚠️ reset 阻塞: 底层 set_stepmotor_reset() 忙等 100ms, 期间协议响应延迟.
+ *    罕见操作 + 上位机自动重试兜底, 可接受.
+ * ==================================================================== */
+
+/* 最近一次 SET 的目标速度 (SDK 无 getter, 固件侧记录供回读) */
+static int16_t step_target[3];
+static uint16_t step_acc[3] = {1000, 1000, 1000};  /* 与 SDK 默认 SPD_ACC 一致 */
+
+static uint8_t stepper_handler(uint8_t op, uint8_t inst, uint8_t prop,
+                               const uint8_t *in_data, uint8_t in_len,
+                               uint8_t *out_data, uint8_t *out_len)
+{
+    if (inst < STP_MOT_CH1 || inst > STP_MOT_CH3) {
+        return STATUS_RANGE_ERR;
+    }
+    int idx = inst - 1;
+
+    switch (op) {
+    case OP_GET:
+        switch (prop) {
+        case 0x01: { /* speed (i16) — 最近一次目标速度 */
+            int16_t spd = step_target[idx];
+            out_data[0] = (uint8_t)(spd & 0xFF);
+            out_data[1] = (uint8_t)((spd >> 8) & 0xFF);
+            *out_len = 2;
+            return STATUS_OK;
+        }
+        case 0x02: { /* distance (i32) */
+            int d = get_stepmotor_distance(inst);
+            out_data[0] = (uint8_t)(d & 0xFF);
+            out_data[1] = (uint8_t)((d >> 8) & 0xFF);
+            out_data[2] = (uint8_t)((d >> 16) & 0xFF);
+            out_data[3] = (uint8_t)((d >> 24) & 0xFF);
+            *out_len = 4;
+            return STATUS_OK;
+        }
+        case 0x03: { /* acc (u16) — 最近一次设置的加减速 */
+            out_data[0] = (uint8_t)(step_acc[idx] & 0xFF);
+            out_data[1] = (uint8_t)((step_acc[idx] >> 8) & 0xFF);
+            *out_len = 2;
+            return STATUS_OK;
+        }
+        default:
+            return STATUS_NOT_FOUND;
+        }
+
+    case OP_SET:
+        switch (prop) {
+        case 0x01: { /* speed (i16) */
+            if (in_len < 2) return STATUS_RANGE_ERR;
+            int spd = (int)(int16_t)((uint16_t)in_data[0]
+                                   | ((uint16_t)in_data[1] << 8));
+            set_stepmotor(inst, spd);
+            step_target[idx] = (int16_t)spd;
+            *out_len = 0;
+            return STATUS_OK;
+        }
+        case 0x03: { /* acc (u16) */
+            if (in_len < 2) return STATUS_RANGE_ERR;
+            uint16_t acc = (uint16_t)in_data[0] | ((uint16_t)in_data[1] << 8);
+            set_stepmotor_acc(inst, acc);
+            step_acc[idx] = acc;
+            *out_len = 0;
+            return STATUS_OK;
+        }
+        default:
+            return STATUS_READ_ONLY;
+        }
+
+    case OP_CALL:
+        switch (prop) {
+        case 0x80: /* stop */
+            set_stepmotor(inst, 0);
+            step_target[idx] = 0;
+            *out_len = 0;
+            return STATUS_OK;
+        case 0x81: /* reset (阻塞 ~100ms) */
+            set_stepmotor_reset();
+            step_target[idx] = 0;
+            *out_len = 0;
+            return STATUS_OK;
+        default:
+            return STATUS_NOT_FOUND;
+        }
+
+    default:
+        return STATUS_NOT_FOUND;
+    }
+}
+
+/* ====================================================================
+ * Service: ServoBus (0x20) — 485 总线舵机
+ *
+ * 底层: SDK step_driver 的 set_step_servoa() — 经 StepMotorThread 统一
+ * 发送 (与步进电机共用 485 总线和 RX 回调, 官方共存方案)。
+ * ⚠️ 其余 485 舵机 API (set_servo_angle / ReadServoaAngle / 力矩) 会
+ * 抢占 setUartPort485_RxHandle 与步进线程冲突, 故不启用。
+ *
+ * inst = 舵机 ID (S1~S18 = 1~18)
+ * Commands:
+ *   0x80 set_angle  [i16 angle(-150~150)][u8 speed(1~100)] 阻塞 ≤10ms
+ *   0x81 change_id  [u8 now_id][u8 new_id(1~3)]  仅支持总线上单个舵机
+ *   0x82 read_angle → i32  读舵机实际角度 (独占总线, 阻塞 ≤10ms)
+ *   0x83 ping      → u8   在线检测 (独占总线)
+ *   0x84 read_version → u16 舵机固件版本 (独占总线)
+ *   0x87 scan      [u8 max_id] → u8×N 在线 ID 列表 (独占总线, 阻塞 ~N×5ms)
+ * ==================================================================== */
+
+static bool servo_bus_started = false;
+static int16_t servo_bus_angle[SERVO_IDMAX];  /* 最近一次目标角度 (SDK 无同步读回) */
+
+static uint8_t servobus_handler(uint8_t op, uint8_t inst, uint8_t prop,
+                                const uint8_t *in_data, uint8_t in_len,
+                                uint8_t *out_data, uint8_t *out_len)
+{
+    if (inst < 1 || inst > SERVO_IDMAX) {
+        /* inst=0 仅允许总线级操作 (scan) */
+        if (!(inst == 0 && op == OP_CALL && prop == 0x87)) {
+            return STATUS_RANGE_ERR;
+        }
+    }
+    int idx = inst - 1;
+
+    switch (op) {
+    case OP_GET:
+        switch (prop) {
+        case 0x01: { /* angle (i16) — 最近一次目标角度 */
+            int16_t a = servo_bus_angle[idx];
+            out_data[0] = (uint8_t)(a & 0xFF);
+            out_data[1] = (uint8_t)((a >> 8) & 0xFF);
+            *out_len = 2;
+            return STATUS_OK;
+        }
+        default:
+            return STATUS_NOT_FOUND;
+        }
+
+    case OP_CALL:
+        switch (prop) {
+        case 0x80: { /* set_angle: [i16 angle][u8 speed] */
+            if (in_len < 3) return STATUS_RANGE_ERR;
+            int16_t angle = (int16_t)((uint16_t)in_data[0]
+                                    | ((uint16_t)in_data[1] << 8));
+            uint8_t speed = in_data[2];
+            if (speed < 1)   speed = 40;
+            if (speed > 100) speed = 100;
+            if (angle < -150) angle = -150;
+            if (angle >  150) angle =  150;
+
+            /* set_step_servoa 依赖 StepMotorThread 消费 sid 队列,
+             * 首次使用时确保步进线程已启动 (速度 0 不影响电机) */
+            if (!servo_bus_started) {
+                set_stepmotor(1, 0);
+                servo_bus_started = true;
+            }
+            set_step_servoa(inst, speed, angle);  /* 阻塞 ≤10ms */
+            servo_bus_angle[idx] = angle;
+            *out_len = 0;
+            return STATUS_OK;
+        }
+        case 0x81: { /* change_id: [u8 now_id][u8 new_id] 目标限 1~3 */
+            if (in_len < 2) return STATUS_RANGE_ERR;
+            uint8_t now_id = in_data[0];
+            uint8_t new_id = in_data[1];
+            if (now_id < 1 || now_id > SERVO_IDMAX) return STATUS_RANGE_ERR;
+            if (new_id < 1 || new_id > 3) return STATUS_RANGE_ERR;
+
+            /* 独占总线: 让步进线程暂停, 避免抢 485 RX 回调 */
+            step_bus_busy = 1;
+            /* SDK 要求: 总线上只有 1 个舵机时才能正确操作 */
+            servo_id_change(now_id, new_id);
+            step_bus_busy = 0;
+            *out_len = 0;
+            return STATUS_OK;
+        }
+        case 0x82: { /* read_angle — 读舵机实际角度 (独占总线) */
+            step_bus_busy = 1;
+            int a = ReadServoaAngle(inst);
+            step_bus_busy = 0;
+            out_data[0] = (uint8_t)(a & 0xFF);
+            out_data[1] = (uint8_t)((a >> 8) & 0xFF);
+            out_data[2] = (uint8_t)((a >> 16) & 0xFF);
+            out_data[3] = (uint8_t)((a >> 24) & 0xFF);
+            *out_len = 4;
+            return STATUS_OK;
+        }
+        case 0x83: { /* ping — 舵机在线检测 (独占总线) */
+            step_bus_busy = 1;
+            int r = Servo_Ping(inst);
+            step_bus_busy = 0;
+            out_data[0] = (uint8_t)(r ? 1 : 0);
+            *out_len = 1;
+            return STATUS_OK;
+        }
+        case 0x84: { /* read_version — 舵机固件版本 (独占总线) */
+            step_bus_busy = 1;
+            int v = ReadServoaVerion(inst);
+            step_bus_busy = 0;
+            out_data[0] = (uint8_t)(v & 0xFF);
+            out_data[1] = (uint8_t)((v >> 8) & 0xFF);
+            *out_len = 2;
+            return STATUS_OK;
+        }
+        case 0x87: { /* scan: [u8 max_id] → u8×N 在线 ID 列表 */
+            uint8_t max_id = SERVO_IDMAX;
+            if (in_len >= 1) {
+                max_id = in_data[0];
+                if (max_id < 1) max_id = 1;
+                if (max_id > SERVO_IDMAX) max_id = SERVO_IDMAX;
+            }
+            uint8_t n = 0;
+            for (uint8_t id = 1; id <= max_id; id++) {
+                step_bus_busy = 1;
+                int r = Servo_Ping(id);
+                step_bus_busy = 0;
+                if (r) {
+                    out_data[n++] = id;
+                }
+            }
+            *out_len = n;
+            return STATUS_OK;
+        }
+        default:
+            return STATUS_NOT_FOUND;
+        }
+
+    default:
+        return STATUS_NOT_FOUND;
+    }
+}
+
+/* ====================================================================
+ * Service: ServoPWM (0x21) — PWM 舵机
+ *
+ * 底层: SDK SetServo() — 独立定时器输出, 7 路 (P7~P13)。
+ *
+ * inst = 1~7 → D1~D7 (P7~P13)
+ * Props:
+ *   0x01 angle u16 r  最近一次目标角度 (0~180)
+ *   0x02 duty  u16 rw  通用 PWM 占空比 (0~1000 = 0~100.0%, 40Hz)
+ * Commands:
+ *   0x80 set_angle  [u16 angle(0~180)][u8 speed(10~100)]
+ * ==================================================================== */
+
+static const int pwm_port_map[7] = {D1, D2, D3, D4, D5, D6, D7};
+static int16_t servo_pwm_angle[7];  /* 最近一次目标角度 */
+static uint16_t servo_pwm_duty[7];  /* 最近一次占空比 (0~1000) */
+
+/* 每个口的定时器/通道 (SDK ServoInit 配置, 周期 ARR+1=1500, 40Hz) */
+static TIM_TypeDef *const pwm_tim_map[7] = {
+    TIM1, TIM1, TIM1, TIM1, TIM3, TIM3, TIM12
+};
+static const uint8_t pwm_ch_map[7] = {1, 2, 3, 4, 2, 1, 1};
+
+static void pwm_set_ccr(TIM_TypeDef *tim, uint8_t ch, uint32_t ccr)
+{
+    switch (ch) {
+    case 1: TIM_SetCompare1(tim, ccr); break;
+    case 2: TIM_SetCompare2(tim, ccr); break;
+    case 3: TIM_SetCompare3(tim, ccr); break;
+    case 4: TIM_SetCompare4(tim, ccr); break;
+    default: break;
+    }
+}
+
+static uint8_t servopwm_handler(uint8_t op, uint8_t inst, uint8_t prop,
+                                const uint8_t *in_data, uint8_t in_len,
+                                uint8_t *out_data, uint8_t *out_len)
+{
+    if (inst < 1 || inst > 7) {
+        return STATUS_RANGE_ERR;
+    }
+    int idx = inst - 1;
+
+    switch (op) {
+    case OP_GET:
+        switch (prop) {
+        case 0x01: { /* angle (i16) — 最近一次目标角度 */
+            int16_t a = servo_pwm_angle[idx];
+            out_data[0] = (uint8_t)(a & 0xFF);
+            out_data[1] = (uint8_t)((a >> 8) & 0xFF);
+            *out_len = 2;
+            return STATUS_OK;
+        }
+        case 0x02: { /* duty (u16) — 最近一次占空比 */
+            uint16_t d = servo_pwm_duty[idx];
+            out_data[0] = (uint8_t)(d & 0xFF);
+            out_data[1] = (uint8_t)((d >> 8) & 0xFF);
+            *out_len = 2;
+            return STATUS_OK;
+        }
+        default:
+            return STATUS_NOT_FOUND;
+        }
+
+    case OP_SET:
+        switch (prop) {
+        case 0x02: { /* duty (u16 0~1000 = 0~100.0%) */
+            if (in_len < 2) return STATUS_RANGE_ERR;
+            uint16_t duty = (uint16_t)in_data[0] | ((uint16_t)in_data[1] << 8);
+            if (duty > 1000) duty = 1000;
+            TIM_TypeDef *tim = pwm_tim_map[idx];
+            uint32_t period = tim->ARR + 1;
+            uint32_t ccr = (uint32_t)period * duty / 1000;
+            pwm_set_ccr(tim, pwm_ch_map[idx], ccr);
+            servo_pwm_duty[idx] = duty;
+            *out_len = 0;
+            return STATUS_OK;
+        }
+        default:
+            return STATUS_READ_ONLY;
+        }
+
+    case OP_CALL:
+        switch (prop) {
+        case 0x80: { /* set_angle: [u16 angle][u8 speed] */
+            if (in_len < 3) return STATUS_RANGE_ERR;
+            int angle = (int)in_data[0] | ((int)in_data[1] << 8);
+            int speed = (int)in_data[2];
+            if (angle < 0)   angle = 0;
+            if (angle > 180) angle = 180;
+            if (speed < 10)  speed = 10;
+            if (speed > 100) speed = 100;
+            SetServo(pwm_port_map[inst - 1], speed, angle);
+            servo_pwm_angle[idx] = (int16_t)angle;
+            *out_len = 0;
+            return STATUS_OK;
+        }
+        default:
+            return STATUS_NOT_FOUND;
+        }
+
+    default:
+        return STATUS_NOT_FOUND;
+    }
+}
+
+/* ====================================================================
+ * Service: IO (0x50) — P1~P6 + D1~D7 数字 IO, 9 路模拟输入
+ *
+ * 引脚映射 (SDK digoutput.h DIG1~DIG13):
+ *   P1~P6  (DIG1~6):  PD5 PD4 PC15 PD10 PA4 PB9
+ *   D1~D7  (DIG7~13): PE9 PE11 PE13 PE14 PA7 PA6 PB14  ⚠️与 PWM 舵机共用
+ * ⚠️ P1/P2 与 UART 复用 (SDK uart_p1/uart_p2), 配成 IO 会禁用串口功能。
+ *
+ * 模拟输入 (SDK getAI):
+ *   inst 1~6 = A1~A6 (P1~P6: PC0 PC1 PC2 PC3 PA0 PA1)
+ *   inst 7~9 = AI1~AI3 (D1~D3: PC4 PC5 PB1)
+ *
+ * Props:
+ *   0x01 value  u8 rw  读: 输入电平 (0/1); 写: 输出电平 (0/1)
+ *   0x02 mode   u8 rw  0=输入(上拉) 1=输出(推挽)
+ *   0x03 analog u16 r  模拟输入 (inst 1~9)
+ * Commands:
+ *   0x80 toggle — 输出反转
+ * ==================================================================== */
+
+#define IO_PORT_MAX 13
+
+static const GPIO_TypeDef *io_port_map[IO_PORT_MAX] = {
+    GPIOD, GPIOD, GPIOC, GPIOD, GPIOA, GPIOB,        /* P1~P6  */
+    GPIOE, GPIOE, GPIOE, GPIOE, GPIOA, GPIOA, GPIOB  /* D1~D7  */
+};
+static const uint16_t io_pin_map[IO_PORT_MAX] = {
+    GPIO_Pin_5, GPIO_Pin_4, GPIO_Pin_15,
+    GPIO_Pin_10, GPIO_Pin_4, GPIO_Pin_9,             /* P1~P6  */
+    GPIO_Pin_9, GPIO_Pin_11, GPIO_Pin_13, GPIO_Pin_14,
+    GPIO_Pin_7, GPIO_Pin_6, GPIO_Pin_14              /* D1~D7  */
+};
+static uint8_t io_mode[IO_PORT_MAX];
+static uint8_t io_out[IO_PORT_MAX];
+
+static void io_config(int idx, int mode)
+{
+    GPIO_InitTypeDef init;
+
+    init.GPIO_Pin = io_pin_map[idx];
+    init.GPIO_Speed = GPIO_Speed_50MHz;
+    init.GPIO_Mode = (mode == 1) ? GPIO_Mode_Out_PP : GPIO_Mode_IPU;
+    GPIO_Init((GPIO_TypeDef *)io_port_map[idx], &init);
+    io_mode[idx] = (uint8_t)mode;
+}
+
+/* ---- ADC 模拟输入: 直接用 SDK getAI(inst), inst 1~6 = A1~A6 ---- */
+
+static void io_init_all(void)
+{
+    /* DIG 口由 SDK InitDo 初始化 (原厂电气配置, 强驱动, 可直驱气泵等负载) */
+    InitDo(0);
+    for (int i = 0; i < IO_PORT_MAX; i++) {
+        io_mode[i] = 1;   /* 默认输出语义 */
+    }
+}
+
+static uint8_t io_handler(uint8_t op, uint8_t inst, uint8_t prop,
+                          const uint8_t *in_data, uint8_t in_len,
+                          uint8_t *out_data, uint8_t *out_len)
+{
+    if (inst < 1 || inst > IO_PORT_MAX) {
+        /* inst=0 仅允许总线级 diag (SDK getAI 参数探测) */
+        if (!(inst == 0 && op == OP_GET && prop == 0x04)) {
+            return STATUS_RANGE_ERR;
+        }
+    }
+    int idx = inst - 1;
+
+    switch (op) {
+    case OP_GET:
+        switch (prop) {
+        case 0x01: { /* value — 读电平 (输入模式读输入, 输出模式读输出) */
+            uint8_t v;
+            if (io_mode[idx] == 1) {
+                v = GPIO_ReadOutputDataBit((GPIO_TypeDef *)io_port_map[idx],
+                                           io_pin_map[idx]) ? 1 : 0;
+            } else {
+                v = GPIO_ReadInputDataBit((GPIO_TypeDef *)io_port_map[idx],
+                                          io_pin_map[idx]) ? 1 : 0;
+            }
+            out_data[0] = v;
+            *out_len = 1;
+            return STATUS_OK;
+        }
+        case 0x02: /* mode */
+            out_data[0] = io_mode[idx];
+            *out_len = 1;
+            return STATUS_OK;
+        case 0x03: { /* analog (u16) — SDK getAI: inst 1~6 = A1~A6 */
+            int v = getAI(inst);
+            out_data[0] = (uint8_t)(v & 0xFF);
+            out_data[1] = (uint8_t)((v >> 8) & 0xFF);
+            *out_len = 2;
+            return STATUS_OK;
+        }
+        case 0x04: { /* diag — SDK getAI 参数探测: getAI(1)~getAI(12) */
+            for (int i = 0; i < 12 && i * 2 + 1 < 32; i++) {
+                int v = getAI(i + 1);
+                out_data[i * 2] = (uint8_t)(v & 0xFF);
+                out_data[i * 2 + 1] = (uint8_t)((v >> 8) & 0xFF);
+            }
+            *out_len = 24;
+            return STATUS_OK;
+        }
+        default:
+            return STATUS_NOT_FOUND;
+        }
+
+    case OP_SET:
+        switch (prop) {
+        case 0x01: { /* value — 输出电平 (SDK 原生 SetDO) */
+            if (in_len < 1) return STATUS_RANGE_ERR;
+            uint8_t v = in_data[0] ? 1 : 0;
+            SetDO(inst, v ? switch_on : switch_off);
+            io_out[idx] = v;
+            *out_len = 0;
+            return STATUS_OK;
+        }
+        case 0x02: { /* mode — 0=输入(上拉) 1=输出(推挽) */
+            if (in_len < 1) return STATUS_RANGE_ERR;
+            uint8_t m = in_data[0] ? 1 : 0;
+            io_config(idx, m);
+            *out_len = 0;
+            return STATUS_OK;
+        }
+        default:
+            return STATUS_READ_ONLY;
+        }
+
+    case OP_CALL:
+        switch (prop) {
+        case 0x80: { /* toggle */
+            if (io_mode[idx] != 1) {
+                io_config(idx, 1);
+            }
+            io_out[idx] ^= 1;
+            SetDO(inst, io_out[idx] ? switch_on : switch_off);
+            *out_len = 0;
+            return STATUS_OK;
+        }
+        default:
+            return STATUS_NOT_FOUND;
+        }
+
+    default:
+        return STATUS_NOT_FOUND;
+    }
+}
+
+/* ====================================================================
  * 初始化
  * ==================================================================== */
 
@@ -538,14 +1047,30 @@ void rx_process_start(void)
         pid_init(&motor_pid[i]);
     }
 
-    /* 注册 Service (System + Motor + MecanumGroup) */
+    /* 注册 Service (System + Motor + MecanumGroup + BTRemote + Stepper + Servo + Chassis) */
     proto_service_register(0xFE, "System",  system_handler);
     proto_service_register(0x01, "Motor",   motor_handler);
     proto_service_register(0x02, "Mecanum", mecanum_group_handler);
     proto_service_register(0x03, "BTRemote", btremote_handler);
+    proto_service_register(0x30, "Stepper", stepper_handler);
+    proto_service_register(0x20, "ServoBus", servobus_handler);
+    proto_service_register(0x21, "ServoPWM", servopwm_handler);
+    proto_service_register(0x04, "Chassis", chassis_handler);
+    proto_service_register(0x50, "IO", io_handler);
+
+    /* PWM 舵机: 初始化定时器 + 打开舵机电源 */
+    ServoInit();
+    SERVO_PWR_ON();
+
+    /* P1~P6 数字 IO */
+    io_init_all();
 
     /* 启动 PID 控制线程 (200Hz, 5ms 周期) */
     ThreadStart(pid_control_loop);
+
+    /* 底盘外环控制器 (200Hz) */
+    chassis_init();
+    chassis_start();
 
     /* 启动协议引擎 (USART1, COBS+CRC8) */
     RxFunc rx_handle_pc = protocol_config(UartPC_Sendbytes);

@@ -44,7 +44,7 @@ DEVICE_DIR    = SDK_DIR                                        # 我们的 C 源
 BUILD_DIR     = SDK_DIR / "build"                             # 编译输出
 DEPLOY_DIR    = WORKSPACE_DIR / "mc602" / "tools" / "flash"  # 部署目标 (--deploy 写入这里)
 
-TOOLCHAIN_DIR = Path(r"C:\Users\young\Desktop\whalesbot\new_whalesbot\AI_Module_GCC\arm_gcc_10")
+TOOLCHAIN_DIR = WORKSPACE_DIR / "toolchain" / "arm_gcc_10"  # 项目内自带工具链
 GCC           = TOOLCHAIN_DIR / "bin" / "arm-none-eabi-gcc.exe"
 OBJCOPY       = TOOLCHAIN_DIR / "bin" / "arm-none-eabi-objcopy.exe"
 SIZE          = TOOLCHAIN_DIR / "bin" / "arm-none-eabi-size.exe"
@@ -98,7 +98,9 @@ SDK_OBJECT_DIRS = [
 ]
 
 # 显式排除 (避免与我们的实现冲突)
-# - step_driver.o: 我们用新版 (含 servo_bus_* API), SDK 闭源是旧版
+# step_driver.o: 用自研源码版 firmware/devices/step_driver.c
+# (增加 485 总线独占标志 step_bus_busy, 供舵机改 ID 等独立 API 使用),
+# SDK 预编译版无此能力。
 EXCLUDE_OBJECTS: set[str] = {
     "step_driver.o",
 }

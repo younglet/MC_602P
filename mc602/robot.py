@@ -16,6 +16,9 @@ from typing import Optional
 from .comm.client import MC602, find_ch340_port
 from .drivers.motor import Motor
 from .drivers.system import System
+from .drivers.stepper import Stepper
+from .drivers.servo import Servo485, ServoPWM
+from .drivers.io import DigitalOutput, AnalogInput, PWM
 from .comm.exceptions import SerialNotFoundError
 
 
@@ -38,6 +41,30 @@ class Robot:
     def motor(self, port: int) -> Motor:
         """返回指定端口的 Motor 实例 (M1~M6)"""
         return Motor(self._bot, port)
+
+    def stepper(self, ch: int) -> Stepper:
+        """返回指定通道的 Stepper 实例 (ST1~ST3, 485 总线步进电机)"""
+        return Stepper(self._bot, ch)
+
+    def servo485(self, servo_id: int) -> Servo485:
+        """返回指定 ID 的 485 总线舵机实例 (S1~S18)"""
+        return Servo485(self._bot, servo_id)
+
+    def servo_pwm(self, port) -> ServoPWM:
+        """返回指定端口的 PWM 舵机实例 (D1~D7, D1=P7; 传 1~7 或 'D1')"""
+        return ServoPWM(self._bot, port)
+
+    def digital_out(self, port) -> DigitalOutput:
+        """数字输出实例 ("P1"~"P6" / "D1"~"D7")"""
+        return DigitalOutput(self._bot, port)
+
+    def analog(self, port) -> AnalogInput:
+        """模拟输入实例 ("A1"~"A6" / "AI1"~"AI3", 共 9 路)"""
+        return AnalogInput(self._bot, port)
+
+    def pwm(self, port) -> PWM:
+        """通用 PWM 实例 ("D1"~"D7")。⚠️ 与同口 DigitalOutput 互斥。"""
+        return PWM(self._bot, port)
 
     @property
     def system(self) -> System:

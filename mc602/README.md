@@ -43,13 +43,15 @@ mc602/
 │   ├── motor.py             MotorService      (SVC 0x01)
 │   ├── system.py            SystemService     (SVC 0xFE)
 │   ├── multi_motors.py      MultiMotorService (SVC 0x02, N=4; 逐路 N≠4)
-│   └── btpad.py             BTPadService      (SVC 0x03)
+│   ├── btpad.py             BTPadService      (SVC 0x03)
+│   └── stepper.py           StepperService    (SVC 0x30, 485 步进)
 ├── drivers/                 面向对象设备
 │   ├── motor.py             Motor(port)
 │   ├── system.py            System
 │   ├── motors.py            Motors (端口映射)
 │   ├── mecanum_chassis.py   MecanumChassis (底盘 + 运动学)
-│   └── btpad.py             BTPad (死区/校准/KEY_MAP)
+│   ├── btpad.py             BTPad (死区/校准/KEY_MAP)
+│   └── stepper.py           Stepper (485 步进, ST1~ST3)
 ├── motion/                  纯数学 (无 RPC)
 │   ├── mecanum.py           MecanumMotion (正逆解 + 里程计)
 │   └── coordinate.py        Transform2D
@@ -94,6 +96,30 @@ state = pad.get_state()                  # BTPadState (原始)
 pad.calibrate()                          # 自动校准
 fwd, strafe, rot = pad.get_deadzoned()   # -1.0~+1.0, 死区
 pad.KEY_MAP[4]                           # "🔺"
+```
+
+### 步进电机 (485 总线)
+```python
+st = robot.stepper(3)            # ST1~ST3, 或 robot.stepper("ST3")
+st.set_speed(3000)               # 脉冲速度 -32000~32000
+st.speed = -1500                 # property 写法
+print(st.distance)               # 驱动器反馈累计脉冲
+st.acc = 2000                    # 加减速 (默认 1000)
+st.stop()                        # 停 (保持力矩)
+st.reset()                       # 复位/释放 (固件阻塞 ~100ms)
+```
+
+### 舵机 (485 总线 + PWM 两个版本)
+```python
+# 485 总线舵机 (S1~S18, 与步进共用总线)
+s = robot.servo485(1)
+s.set_angle(90)                  # -150~150, speed 默认 40
+s.angle = -45                    # property 写法
+
+# PWM 舵机 (P7~P13, 7 路)
+p = robot.servo_pwm(7)           # 或 robot.servo_pwm("P7")
+p.set_angle(90, speed=60)        # 0~180, speed 10~100
+p.angle = 135
 ```
 
 ## 通信参数

@@ -65,10 +65,8 @@ class Motor:
     """per-instance 电机对象 (M1~M6)"""
 
     def __init__(self, bot, port):
-        if isinstance(port, str):
-            port = int(port.strip().upper().lstrip("M"))
-        if not (1 <= port <= 6):
-            raise ValueError(f"port 必须在 1~6, 收到 {port}")
+        from ..drivers.constants import resolve_port, MOTOR_NAMES
+        port = resolve_port(port, MOTOR_NAMES, "电机端口")
         self._bot = bot
         self._service = bot.motor if bot is not None else None
         self.port = port

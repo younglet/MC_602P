@@ -21,6 +21,12 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
+# ===== 工具链 (项目自带, 不入库) =====
+toolchain/
+
+# ===== 会话日志 =====
+*.jsonl
+
 # ===== 系统文件 =====
 *.tmp
 *.bak
