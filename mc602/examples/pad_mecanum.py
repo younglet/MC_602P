@@ -25,6 +25,7 @@ from mc602 import (MC602, MecanumChassis,
 
 LOOP_HZ     = 10
 MAX_SPEED   = 60.0     # cm/s, 摇杆推到底对应的车身速度
+MAX_OMEGA   = 0.8      # rad/s, 摇杆推到底对应的旋转角速度 (~46°/s)
 SPEED_FAST  = 1.0      # L1 倍率
 SPEED_SLOW  = 0.4      # R1 倍率
 
@@ -112,7 +113,7 @@ def main() -> int:
             if not stopped:
                 fwd     = bot.pad._deadzone(s.stick1, c1, dz) * MAX_SPEED * speed
                 strafe  = bot.pad._deadzone(s.stick2, c2, dz) * MAX_SPEED * speed
-                rot     = bot.pad._deadzone(s.stick4, c4, dz) * MAX_SPEED * speed
+                rot     = bot.pad._deadzone(s.stick4, c4, dz) * MAX_OMEGA * speed
                 v = (fwd, strafe, rot)
                 if v != last_v:
                     last_v = v
