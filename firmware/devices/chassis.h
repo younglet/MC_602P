@@ -32,6 +32,12 @@
  *     0x28 MAX_VEL_LIN      u16    (cm/s)
  *     0x29 MAX_VEL_ANG      u16    (deg/s)
  *     0x30 TIMEOUT          u16    (ms)
+ *     0x32 DIRECT_MODE      u8 rw  0=上位机控制 1=固件直读摇杆 (BTPad)
+ *     0x33 DIRECT_DEADZONE  u8 rw  死区 % (0~50, 默认 15)
+ *     0x34 DIRECT_MAX_V     u16 rw 满量程线速度 cm/s (默认 60)
+ *     0x35 DIRECT_MAX_W     u16 rw 满量程角速度 deg/s (默认 46)
+ *     0x36 DIRECT_INVERT    u8 rw  方向反转位图 (bit0=前后 bit1=横移 bit2=旋转)
+ *     0x37 DIRECT_GAIN      u8 rw  摇杆曲线 0=线性 1~3=指数 (默认 0)
  *   CALL:
  *     0x80 GOTO_POSE        i32×3 + u8  (x*100, y*100, θ*1000, max_speed)
  *     0x81 ABORT            ()
@@ -65,6 +71,7 @@ extern "C" {
 #define CH_MODE_OFF         0   /* 不跑外环, 完全停车 */
 #define CH_MODE_GOTO        1   /* 外环: 去目标点 */
 #define CH_MODE_TWIST       2   /* 外环 off, host 直接给速度 (透传) */
+#define CH_MODE_DIRECT      3   /* 固件直读摇杆 (BTPad) */
 
 /* ===== 错误子码 (sub_code) ===== */
 #define CH_ERR_NONE         0
@@ -161,6 +168,14 @@ typedef struct {
     /* 超时 */
     uint32_t timeout_ms;        /* GOTO 移动超时 */
     uint32_t move_start_ms;
+
+    /* 固件直读摇杆 (DIRECT/BTPad 模式) */
+    uint8_t  direct_mode;       /* 0=上位机控制 1=固件直读 */
+    uint8_t  direct_deadzone;   /* % 0~50 */
+    uint8_t  direct_invert;     /* 方向反转位图 */
+    uint8_t  direct_gain;       /* 曲线 0~3 */
+    float    direct_max_v;      /* cm/s */
+    float    direct_max_w;      /* rad/s */
 
 
     /* 统计 */

@@ -85,6 +85,14 @@ void chassis_init(void)
     g_ch.max_speed_cmd = 80;
     g_ch.timeout_ms = CH_DEF_TIMEOUT_MS;
 
+    /* 固件直读摇杆默认参数 */
+    g_ch.direct_mode     = 0;
+    g_ch.direct_deadzone = 15;
+    g_ch.direct_max_v    = 60.0f;
+    g_ch.direct_max_w    = 0.8f;
+    g_ch.direct_invert   = 0;
+    g_ch.direct_gain     = 0;
+
     g_ch.state  = CH_IDLE;
     g_ch.mode   = CH_MODE_OFF;
     g_ch.start_time_s = (uint32_t)seconds();
@@ -262,6 +270,66 @@ static void chassis_control_loop(void)
             vy = g_ch.target_vy;
             w  = g_ch.target_w;
             break;
+        case CH_MODE_DIRECT: {
+            /* 固件直读摇杆: BTSTICK1=前后 BTSTICK2=横移 BTSTICK4=旋转 */
+            int s1 = get_bt_remote_control(BTSTICK1);
+            int s2 = get_bt_remote_control(BTSTICK2);
+            int s4 = get_bt_remote_control(BTSTICK4);
+
+            /* 手柄断开 → 自动停车 */
+            if (!getbtstatus()) {
+                vx = 0.0f; vy = 0.0f; w = 0.0f;
+                break;
+            }
+
+            /* 自动标定满量程: 摇杆范围 0~100 / 0~255 / 0~1023 */
+            static int stick_scale = 0;
+            int max_abs = 0;
+            if (stick_scale == 0) {
+                max_abs = s1;
+                if (s2 > max_abs) max_abs = s2;
+                if (s4 > max_abs) max_abs = s4;
+                if (max_abs > 0) stick_scale = max_abs;
+            } else {
+                /* 定期重标定: 每次读到更大的值就更新 */
+                max_abs = s1;
+                if (s2 > max_abs) max_abs = s2;
+                if (s4 > max_abs) max_abs = s4;
+                if (max_abs > stick_scale) stick_scale = max_abs;
+            }
+            if (stick_scale <= 0) stick_scale = 100;
+
+            /* 摇杆 → -1.0~+1.0 (带死区) */
+            float dz = (float)g_ch.direct_deadzone / 100.0f;
+            float f1 = (float)(s1 - stick_scale) / (float)stick_scale;
+            float f2 = (float)(s2 - stick_scale) / (float)stick_scale;
+            float f4 = (float)(s4 - stick_scale) / (float)stick_scale;
+
+            if (fabsf(f1) < dz) f1 = 0.0f;
+            if (fabsf(f2) < dz) f2 = 0.0f;
+            if (fabsf(f4) < dz) f4 = 0.0f;
+
+            /* 可选指数曲线: 低灵敏度区更细腻 */
+            if (g_ch.direct_gain > 0) {
+                float g = 1.0f + 0.3f * g_ch.direct_gain;
+                float sgn1 = (f1 < 0) ? -1.0f : 1.0f;
+                float sgn2 = (f2 < 0) ? -1.0f : 1.0f;
+                float sgn4 = (f4 < 0) ? -1.0f : 1.0f;
+                f1 = sgn1 * powf(fabsf(f1), g);
+                f2 = sgn2 * powf(fabsf(f2), g);
+                f4 = sgn4 * powf(fabsf(f4), g);
+            }
+
+            /* 方向反转 */
+            if (g_ch.direct_invert & 0x01) f1 = -f1;
+            if (g_ch.direct_invert & 0x02) f2 = -f2;
+            if (g_ch.direct_invert & 0x04) f4 = -f4;
+
+            vx = f1 * g_ch.direct_max_v;
+            vy = f2 * g_ch.direct_max_v;
+            w  = f4 * g_ch.direct_max_w;
+            break;
+        }
         default: /* OFF */
             apply = 0;
             break;
@@ -386,6 +454,12 @@ uint8_t chassis_handler(uint8_t op, uint8_t inst, uint8_t prop,
         case 0x28: /* MAX_VEL_LIN (u16 cm/s) */
         case 0x29: /* MAX_VEL_ANG (u16 deg/s) */
         case 0x30: /* TIMEOUT (u16 ms) */
+        case 0x32: /* DIRECT_MODE (u8) */
+        case 0x33: /* DIRECT_DEADZONE (u8) */
+        case 0x34: /* DIRECT_MAX_V (u16) */
+        case 0x35: /* DIRECT_MAX_W (u16) */
+        case 0x36: /* DIRECT_INVERT (u8) */
+        case 0x37: /* DIRECT_GAIN (u8) */
         {
             float *f = NULL;
             switch (prop) {
@@ -409,6 +483,26 @@ uint8_t chassis_handler(uint8_t op, uint8_t inst, uint8_t prop,
                 wire_u16(out_data, (uint16_t)(g_ch.max_w * 180.0f / (float)M_PI));
             } else if (prop == 0x30) {
                 wire_u16(out_data, (uint16_t)g_ch.timeout_ms);
+            } else if (prop == 0x32) {
+                out_data[0] = g_ch.direct_mode;
+                *out_len = 1;
+                return STATUS_OK;
+            } else if (prop == 0x33) {
+                out_data[0] = g_ch.direct_deadzone;
+                *out_len = 1;
+                return STATUS_OK;
+            } else if (prop == 0x34) {
+                wire_u16(out_data, (uint16_t)g_ch.direct_max_v);
+            } else if (prop == 0x35) {
+                wire_u16(out_data, (uint16_t)(g_ch.direct_max_w * 180.0f / (float)M_PI));
+            } else if (prop == 0x36) {
+                out_data[0] = g_ch.direct_invert;
+                *out_len = 1;
+                return STATUS_OK;
+            } else if (prop == 0x37) {
+                out_data[0] = g_ch.direct_gain;
+                *out_len = 1;
+                return STATUS_OK;
             } else {
                 return STATUS_NOT_FOUND;
             }
@@ -456,6 +550,12 @@ uint8_t chassis_handler(uint8_t op, uint8_t inst, uint8_t prop,
         case 0x28:
         case 0x29:
         case 0x30:
+        case 0x32:
+        case 0x33:
+        case 0x34:
+        case 0x35:
+        case 0x36:
+        case 0x37:
         {
             if (in_len < 2) return STATUS_RANGE_ERR;
             uint16_t v = (uint16_t)(in_data[0] | (in_data[1] << 8));
@@ -471,6 +571,12 @@ uint8_t chassis_handler(uint8_t op, uint8_t inst, uint8_t prop,
             case 0x28: g_ch.max_v    = (float)v;    break;
             case 0x29: g_ch.max_w    = v * (float)M_PI / 180.0f; break;
             case 0x30: g_ch.timeout_ms = v;         break;
+            case 0x32: g_ch.direct_mode = (uint8_t)v; break;
+            case 0x33: g_ch.direct_deadzone = (uint8_t)v; break;
+            case 0x34: g_ch.direct_max_v = (float)v; break;
+            case 0x35: g_ch.direct_max_w = v * (float)M_PI / 180.0f; break;
+            case 0x36: g_ch.direct_invert = (uint8_t)v; break;
+            case 0x37: g_ch.direct_gain = (uint8_t)v; break;
             }
             *out_len = 0;
             return STATUS_OK;
@@ -514,6 +620,22 @@ uint8_t chassis_handler(uint8_t op, uint8_t inst, uint8_t prop,
             g_ch.target_w  = (float)(int16_t)(in_data[4] | (in_data[5] << 8)) / 1000.0f;
             g_ch.state = CH_RUNNING;
             g_ch.mode = CH_MODE_TWIST;
+            *out_len = 0;
+            return STATUS_OK;
+        }
+        case 0x87: { /* SET_DIRECT: [u8 enable] 固件直读摇杆 */
+            if (in_len < 1) return STATUS_RANGE_ERR;
+            if (in_data[0]) {
+                g_ch.state = CH_RUNNING;
+                g_ch.mode = CH_MODE_DIRECT;
+            } else {
+                g_ch.mode = CH_MODE_OFF;
+                g_ch.state = CH_IDLE;
+                set_motor(1, 0);
+                set_motor(2, 0);
+                set_motor(3, 0);
+                set_motor(4, 0);
+            }
             *out_len = 0;
             return STATUS_OK;
         }

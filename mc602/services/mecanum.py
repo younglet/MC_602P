@@ -55,7 +55,13 @@ class ChassisService:
     PROP_TOL_ANG = 0x27  # u16 deg×10
     PROP_MAX_V = 0x28    # u16 cm/s
     PROP_MAX_W = 0x29    # u16 deg/s
-    PROP_TIMEOUT = 0x30  # u16 ms (GOTO 移动超时)
+    PROP_TIMEOUT = 0x30  # u16 ms
+    PROP_DIRECT_MODE = 0x32     # u8 rw 0=上位机控制 1=固件直读摇杆
+    PROP_DIRECT_DEADZONE = 0x33 # u8 rw 死区 %
+    PROP_DIRECT_MAX_V = 0x34    # u16 rw 满量程线速度 cm/s
+    PROP_DIRECT_MAX_W = 0x35    # u16 rw 满量程角速度 deg/s
+    PROP_DIRECT_INVERT = 0x36   # u8 rw 方向反转位图
+    PROP_DIRECT_GAIN = 0x37     # u8 rw 摇杆曲线 (GOTO 移动超时)
 
     # CALL commands
     CALL_GOTO = 0x80     # i32×3 + u8 max_speed
@@ -65,6 +71,7 @@ class ChassisService:
     CALL_EMERGENCY = 0x84
     CALL_CLEAR_ERROR = 0x85
     CALL_RESET_STATS = 0x86
+    CALL_SET_DIRECT = 0x87   # [u8 enable] 固件直读摇杆
 
     def __init__(self, bot):
         self._bot = bot
@@ -207,5 +214,42 @@ class ChassisService:
         self._bot._request(
             Op.SET, self.SVC, 0, self.PROP_TIMEOUT,
             value=int(ms).to_bytes(2, "little"),
+        )
+
+    # ---------- 固件直读摇杆 (BTPad 模式) ----------
+
+    def set_direct(self, enable: bool) -> None:
+        """固件直读蓝牙摇杆控制 (BTPad 模式)。
+        启用后摇杆在固件 200Hz 闭环内直接驱动底盘,
+        摇杆归中/手柄断开自动停车。"""
+        self._bot._request(
+            Op.CALL, self.SVC, 0, self.CALL_SET_DIRECT,
+            value=bytes([1 if enable else 0]),
+            timeout=1.0, retry=2, retry_delay=0.1,
+        )
+
+    def set_direct_params(self, deadzone: int = 15, max_v: float = 60.0,
+                          max_w: float = 46.0, invert: int = 0,
+                          gain: int = 0) -> None:
+        """固件直读摇杆参数: 死区%/满量程速度/方向反转/曲线。"""
+        self._bot._request(
+            Op.SET, self.SVC, 0, self.PROP_DIRECT_DEADZONE,
+            value=int(max(0, min(50, deadzone))).to_bytes(2, "little"),
+        )
+        self._bot._request(
+            Op.SET, self.SVC, 0, self.PROP_DIRECT_MAX_V,
+            value=int(max_v).to_bytes(2, "little"),
+        )
+        self._bot._request(
+            Op.SET, self.SVC, 0, self.PROP_DIRECT_MAX_W,
+            value=int(max_w).to_bytes(2, "little"),
+        )
+        self._bot._request(
+            Op.SET, self.SVC, 0, self.PROP_DIRECT_INVERT,
+            value=int(invert & 0x07).to_bytes(2, "little"),
+        )
+        self._bot._request(
+            Op.SET, self.SVC, 0, self.PROP_DIRECT_GAIN,
+            value=int(max(0, min(3, gain))).to_bytes(2, "little"),
         )
 

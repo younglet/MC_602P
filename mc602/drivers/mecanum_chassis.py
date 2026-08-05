@@ -51,7 +51,13 @@ class MecanumChassis:
                  wheel_base: float = 28.0,
                  wheel_radius: float = 3.0,
                  encoder_ppr: int = 2048,
-                 roller_adjust: float = 1.052):
+                 roller_adjust: float = 1.052,
+                 control_method=None):
+        """Mecanum 车 — 固件外环控制器客户端。
+
+        control_method: None (默认) 上位机控制; "BTPad" 固件直读蓝牙摇杆
+                        (摇杆归中/断连自动停车, 参数见 direct_* 属性)。
+        """
         if tuple(ports) != (1, 2, 3, 4):
             raise ValueError("固件外环固定使用 M1~M4, ports 参数已由固件接管")
         self._bot = bot
@@ -68,6 +74,9 @@ class MecanumChassis:
                 wheel_radius=wheel_radius, encoder_ppr=encoder_ppr,
                 roller_adjust=roller_adjust,
             )
+        self._control_method = None
+        if control_method is not None:
+            self.control_method = control_method
 
     # ── 控制 ──────────────────────────────────────────
 
@@ -153,6 +162,32 @@ class MecanumChassis:
     @property
     def geometry(self) -> dict:
         return dict(self._geom)
+
+    @property
+    def control_method(self):
+        """控制方式: None=上位机控制, "BTPad"=固件直读摇杆。"""
+        return self._control_method
+
+    @control_method.setter
+    def control_method(self, method) -> None:
+        if method is None:
+            if self._service is not None:
+                self._service.set_direct(False)
+            self._control_method = None
+        elif method == "BTPad":
+            if self._service is not None:
+                self._service.set_direct_params()   # 默认参数
+                self._service.set_direct(True)
+            self._control_method = "BTPad"
+        else:
+            raise ValueError(f"未知控制方式: {method}, 可用 None/'BTPad'")
+
+    def set_direct_params(self, deadzone: int = 15, max_v: float = 60.0,
+                          max_w: float = 46.0, invert: int = 0,
+                          gain: int = 0) -> None:
+        """固件直读摇杆参数细调 (死区/满量程/反转/曲线)。"""
+        if self._service is not None:
+            self._service.set_direct_params(deadzone, max_v, max_w, invert, gain)
 
     def __repr__(self) -> str:
         return (f"<MecanumChassis {self._geom['track']}x"
