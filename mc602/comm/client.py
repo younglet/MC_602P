@@ -150,6 +150,13 @@ class MC602:
                 parity=serial.PARITY_NONE,
                 stopbits=serial.STOPBITS_ONE,
             )
+            # 关键: 打开后立即禁用 DTR/RTS — CH340 的 DTR 接复位电路,
+            # pyserial 默认拉高 DTR → 固件复位 → 重启需 ~10s → 首个请求超时
+            try:
+                self._ser.dtr = False
+                self._ser.rts = False
+            except Exception:
+                pass
         except (serial.SerialException, OSError) as e:
             raise ConnectionError(f"打开串口失败: {self._port_name}: {e}") from e
 

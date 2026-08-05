@@ -265,7 +265,10 @@ static void Uart_RevCallback(int revdata)
     }
     time_last = seconds();
 
-    /* PING 检测：收到 0x55 或已在 PING 序列中才继续匹配 */
+    /* PING 检测：收到 0x55 或已在 PING 序列中才继续匹配
+     * ⚠️ 匹配过程中的字节不能 return 吞掉 —— 数据帧里的 0x55
+     * (如 SET 0x29 的 value=85=0x55) 必须照常进入数据接收,
+     * 否则帧缺字节 → CRC 错 → 请求被丢弃 (表现为随机超时)。 */
     if (ping_flag || byte == 0x55) {
         if (byte == PING_DATA[ping_idx]) {
             ping_flag = 1;
@@ -274,17 +277,16 @@ static void Uart_RevCallback(int revdata)
                 ping_status = 1;
                 ping_flag = 0;
                 ping_idx = 0;
+                /* 复位由主循环消费 ping_status 触发 */
             }
-            return;  /* PING 匹配中，不进入数据接收 */
         } else {
             /* 不匹配，退出 PING 模式 */
             ping_flag = 0;
             ping_idx = 0;
-            /* 继续进入数据接收 */
         }
     }
 
-    /* 数据接收 */
+    /* 数据接收 (PING 序列字节也照常进入, 形成无效帧被 CRC 丢弃) */
     if (rx_idx < RX_BUF_SIZE) {
         rx_buf[rx_idx++] = byte;
 
