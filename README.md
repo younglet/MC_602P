@@ -67,7 +67,8 @@ python mc602/examples/mecanum_full_eval.py   # 4 路电机全面评测
 | `mc602/` | **发布包**: Python SDK + tools/flash/ + examples + tests |
 | `mc602/examples/` | 实机 demo/eval (需硬件) |
 | `unit_test/` | 单元测试 (mock, 验证代码) |
-| `mc602/examples/` | 用户导向: demo/硬件测试/eval/标定 |
+| `mc602/tests/` | 基础硬件功能测试 (简单) |
+| `mc602/examples/` | 复杂项目: 遥控/评测/标定 |
 
 ---
 
