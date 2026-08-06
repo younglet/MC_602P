@@ -8,7 +8,7 @@ test_chassis_unit.py — Chassis service/driver 纯单元测试 (无需硬件)
 import os
 import sys
 
-grandparent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+grandparent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 sys.path.insert(0, grandparent_dir)
 
 from mc602.comm.packet import Op, Payload

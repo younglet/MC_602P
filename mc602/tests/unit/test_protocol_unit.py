@@ -3,7 +3,7 @@ import os
 
 # 获取当前文件所在目录的"上上级目录"的绝对路径
 # (模拟从外部项目根导入 mc602 的效果)
-grandparent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+grandparent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 sys.path.insert(0, grandparent_dir)
 
 from mc602.comm.packet import (
