@@ -62,6 +62,18 @@ class ChassisService:
     PROP_DIRECT_MAX_W = 0x35    # u16 rw 满量程角速度 deg/s
     PROP_DIRECT_INVERT = 0x36   # u8 rw 方向反转位图
     PROP_DIRECT_GAIN = 0x37     # u8 rw 摇杆曲线 (GOTO 移动超时)
+    PROP_SPD_KP_X = 0x38  # u16 rw 速度环 X Kp (×1000)
+    PROP_SPD_KI_X = 0x39  # u16 rw 速度环 X Ki (×1000)
+    PROP_SPD_KD_X = 0x3A  # u16 rw 速度环 X Kd (×1000)
+    PROP_SPD_KP_Y = 0x3B  # u16 rw 速度环 Y Kp (×1000)
+    PROP_SPD_KI_Y = 0x3C  # u16 rw 速度环 Y Ki (×1000)
+    PROP_SPD_KD_Y = 0x3D  # u16 rw 速度环 Y Kd (×1000)
+    PROP_SPD_KP_W = 0x3E  # u16 rw 速度环 W Kp (×1000)
+    PROP_SPD_KI_W = 0x3F  # u16 rw 速度环 W Ki (×1000)
+    PROP_SPD_KD_W = 0x40  # u16 rw 速度环 W Kd (×1000)
+    PROP_SPD_OUT_LIM_V = 0x41  # u16 rw 输出限幅 cm/s (默认 60 = ±0.6m/s)
+    PROP_SPD_OUT_LIM_W = 0x42  # u16 rw 输出限幅 deg/s (默认 86 = ±1.5rad/s)
+    PROP_WHEEL_FULL_V = 0x43   # u16 rw 电机满量程轮速标定 cm/s (默认 100, SDK 1:1)
 
     # CALL commands
     CALL_GOTO = 0x80     # i32×3 + u8 max_speed
@@ -200,7 +212,8 @@ class ChassisService:
             value=int(ang_deg * 10).to_bytes(2, "little"),
         )
 
-    def set_max_vel(self, v_cm_s: float = 40.0, w_deg_s: float = 90.0) -> None:
+    def set_max_vel(self, v_cm_s: float = 70.0, w_deg_s: float = 172.0) -> None:
+        """速度上限 (参考 cfg_vehicle.yaml: 0.7 m/s, 3.0 rad/s ≈ 172°/s)。"""
         self._bot._request(
             Op.SET, self.SVC, 0, self.PROP_MAX_V,
             value=int(v_cm_s).to_bytes(2, "little"),
@@ -214,6 +227,53 @@ class ChassisService:
         self._bot._request(
             Op.SET, self.SVC, 0, self.PROP_TIMEOUT,
             value=int(ms).to_bytes(2, "little"),
+        )
+
+    # ---------- 车身速度环 (pid_x/pid_y/pid_yaw, 200Hz 固件内环) ----------
+
+    def set_speed_pid(self, kp_x: float = 1.0, ki_x: float = 0.3,
+                      kd_x: float = 0.0, kp_y: float = 1.0,
+                      ki_y: float = 0.3, kd_y: float = 0.0,
+                      kp_w: float = 1.0, ki_w: float = 0.3,
+                      kd_w: float = 0.0, out_lim_v: float = 60.0,
+                      out_lim_w: float = 86.0) -> None:
+        """车身速度环三轴 PID + 输出限幅。
+
+        默认 = 空转(无负载)保守参数 Kp=1/Ki=0.3/Kd=0;
+        cfg_vehicle.yaml 参考值 (6/0.3/0.1 等) 为贴地车调值。
+        贴地后跑 tools/speed_loop_eval.py --tune 精调。
+
+        三轴系数全 0 → 固件旁路速度环, 等效开环透传 (旧行为)。
+        out_lim_v: cm/s (±0.6 m/s), out_lim_w: deg/s (±1.5 rad/s)。
+        """
+        gains = ((self.PROP_SPD_KP_X, kp_x), (self.PROP_SPD_KI_X, ki_x),
+                 (self.PROP_SPD_KD_X, kd_x), (self.PROP_SPD_KP_Y, kp_y),
+                 (self.PROP_SPD_KI_Y, ki_y), (self.PROP_SPD_KD_Y, kd_y),
+                 (self.PROP_SPD_KP_W, kp_w), (self.PROP_SPD_KI_W, ki_w),
+                 (self.PROP_SPD_KD_W, kd_w))
+        for prop, k in gains:
+            self._bot._request(
+                Op.SET, self.SVC, 0, prop,
+                value=int(k * 1000).to_bytes(2, "little"),
+            )
+        self._bot._request(
+            Op.SET, self.SVC, 0, self.PROP_SPD_OUT_LIM_V,
+            value=int(out_lim_v).to_bytes(2, "little"),
+        )
+        self._bot._request(
+            Op.SET, self.SVC, 0, self.PROP_SPD_OUT_LIM_W,
+            value=int(out_lim_w).to_bytes(2, "little"),
+        )
+
+    def set_wheel_full_v(self, v_cm_s: float = 100.0) -> None:
+        """电机满量程轮速标定 (scale 基准)。
+
+        SDK set_motor(100) 对应的轮速 cm/s, 实测 1:1 (≈100cm/s)。
+        换电机/减速比后重新标定: 读编码器差分 / 速度指令 × 100。
+        """
+        self._bot._request(
+            Op.SET, self.SVC, 0, self.PROP_WHEEL_FULL_V,
+            value=int(v_cm_s).to_bytes(2, "little"),
         )
 
     # ---------- 固件直读摇杆 (BTPad 模式) ----------

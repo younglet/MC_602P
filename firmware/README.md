@@ -269,6 +269,31 @@ payload:
 
 ---
 
+### 7.6 Chassis Service (svc=0x04) — 麦轮底盘 (外环 + 车身速度环)
+
+200Hz 控制环: 读 4 编码器 → 增量里程计 → (GOTO: 极坐标 P) → **车身速度环**
+→ 逆运动学 → `set_motor` ×4。几何/控制参数由 host 推送或使用默认值。
+
+| Prop | 访问 | 含义 |
+|------|------|------|
+| 0x01 pose | r | 位姿 x/y (cm×100) + θ (rad×1000) |
+| 0x02 status | r | 状态机 (IDLE/RUNNING/ARRIVED/...) |
+| 0x03 twist | r | 目标车身速度 |
+| 0x06 stats | r | 总里程/到达次数/运行秒数 |
+| 0x10 geometry | rw | 几何 (track/base/radius/ppr/roller) |
+| 0x20~0x25 | rw | GOTO 极坐标 P/KI 参数 |
+| 0x26~0x30 | rw | 容差 / 速度上限 / 超时 |
+| 0x38~0x40 | rw | 速度环三轴 Kp/Ki/Kd (×1000) |
+| 0x41/0x42 | rw | 速度环输出限幅 (±cm/s, ±deg/s) |
+
+**车身速度环** (pid_x/pid_y/pid_yaw, 参考 cfg_vehicle.yaml):
+编码器差分 → 前向运动学 → 实测车身速度 → PID → 限幅 → 逆运动学。
+默认参数 Kp/Ki/Kd = 6/0.3/0.1 (X), 8/0.3/0.1 (Y), 10/0.2/0.1 (W),
+输出限幅 ±60 cm/s / ±86°/s; 速度上限默认 70 cm/s / 172°/s (0.7m/s, 3rad/s)。
+**三轴系数全 0 = 旁路**, 等效旧版开环透传。
+
+---
+
 ## 8. ⚠️ 已踩过的坑（MCU 端）
 
 ### 8.1 SDK 的 `show()` 是 **1-indexed**

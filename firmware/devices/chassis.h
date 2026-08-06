@@ -38,6 +38,15 @@
  *     0x35 DIRECT_MAX_W     u16 rw 满量程角速度 deg/s (默认 46)
  *     0x36 DIRECT_INVERT    u8 rw  方向反转位图 (bit0=前后 bit1=横移 bit2=旋转)
  *     0x37 DIRECT_GAIN      u8 rw  摇杆曲线 0=线性 1~3=指数 (默认 0)
+ *     0x38-0x3A SPD_PID_X    u16 rw Kp/Ki/Kd (×1000, 参考 6/0.3/0.1)
+ *     0x3B-0x3D SPD_PID_Y    u16 rw Kp/Ki/Kd (×1000, 参考 8/0.3/0.1)
+ *     0x3E-0x40 SPD_PID_W    u16 rw Kp/Ki/Kd (×1000, 参考 10/0.2/0.1)
+ *     0x41 SPD_OUT_LIM_V     u16 rw 速度环输出限幅 cm/s (默认 60 = ±0.6m/s)
+ *     0x42 SPD_OUT_LIM_W     u16 rw 速度环输出限幅 deg/s (默认 86 = ±1.5rad/s)
+ *     0x43 WHEEL_FULL_V      u16 rw 电机满量程轮速标定 cm/s (默认 100, SDK 1:1)
+ *     注: 三轴系数全 0 → 速度环旁路, 等效开环透传 (旧行为)
+ *     注: max_v/max_w = 安全速度限制 (cfg_vehicle.yaml 0.7m/s/3rad/s),
+ *         SET_TWIST 目标会被 clamp 到该限制; wheel_full_v 仅用于 scale。
  *   CALL:
  *     0x80 GOTO_POSE        i32×3 + u8  (x*100, y*100, θ*1000, max_speed)
  *     0x81 ABORT            ()
@@ -98,9 +107,28 @@ extern "C" {
 /* 容差/速度默认 */
 #define CH_DEF_POS_TOL      2.0f     /* cm */
 #define CH_DEF_ANG_TOL      0.052f   /* rad (~3 deg) */
-#define CH_DEF_MAX_V        40.0f    /* cm/s */
-#define CH_DEF_MAX_W        1.57f    /* rad/s (~90 deg/s) */
+#define CH_DEF_MAX_V        70.0f    /* cm/s (0.7 m/s, cfg_vehicle.yaml) */
+#define CH_DEF_MAX_W        3.0f     /* rad/s (~172 deg/s, 参考 3.0 rad/s) */
 #define CH_DEF_TIMEOUT_MS   10000
+
+/* 车身速度环 (pid_x/pid_y/pid_yaw, 参考 cfg_vehicle.yaml)
+ * 200Hz 内环: 编码器差分→前向运动学→三轴 PID→限幅→逆运动学。
+ * 三轴系数全 0 = 旁路 (等效旧版开环透传)。
+ * 默认值 = 空转(无负载)保守参数 Kp=1/Ki=0.3/Kd=0 — 空转执行器带宽
+ * 远超 200Hz 控制环, 大增益会积分 windup 极限环振荡; 贴地(有负载)
+ * 后跑 speed_loop_eval.py --tune 精调 (cfg_vehicle.yaml 参考 6/0.3/0.1)。 */
+#define CH_DEF_KP_X         1.0f
+#define CH_DEF_KI_X         0.3f
+#define CH_DEF_KD_X         0.0f
+#define CH_DEF_KP_Y         1.0f
+#define CH_DEF_KI_Y         0.3f
+#define CH_DEF_KD_Y         0.0f
+#define CH_DEF_KP_W         1.0f
+#define CH_DEF_KI_W         0.3f
+#define CH_DEF_KD_W         0.0f
+#define CH_DEF_OUT_LIM_V    60.0f    /* cm/s (±0.6 m/s) */
+#define CH_DEF_OUT_LIM_W    1.5f     /* rad/s (±1.5 rad/s) */
+#define CH_DEF_WHEEL_FULL_V 100.0f   /* 电机满量程轮速 cm/s (SDK 1:1 标定) */
 
 /* ===== 控制环周期 (5ms = 200Hz) ===== */
 #define CH_DT               0.005f
@@ -155,6 +183,21 @@ typedef struct {
     /* 积分累积 */
     float i_rho, i_alpha, i_beta;
     float prev_rho, prev_alpha, prev_beta;
+
+    /* 车身速度环 PID (pid_x/pid_y/pid_yaw, 200Hz) */
+    float kp_x, ki_x, kd_x;
+    float kp_y, ki_y, kd_y;
+    float kp_w, ki_w, kd_w;
+    float out_lim_v;            /* 输出限幅 cm/s */
+    float out_lim_w;            /* 输出限幅 rad/s */
+    float i_x, i_y, i_w;        /* 积分累积 */
+    float prev_ex, prev_ey, prev_ew;  /* 上次误差 (微分) */
+
+    /* 电机满量程标定: set_motor(100) = wheel_full_v cm/s (scale 基准) */
+    float wheel_full_v;
+
+    /* 速度环反馈低通 (一阶, 编码器 5ms 差分噪声大) */
+    float vx_f, vy_f, w_f;
 
     /* 容差 */
     float pos_tol;

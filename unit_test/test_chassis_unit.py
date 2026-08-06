@@ -141,6 +141,54 @@ def test_state():
     check("stats runtime", st["runtime_s"] == 42)
 
 
+def test_speed_pid():
+    print("[ChassisService — 车身速度环 PID]")
+    bot = FakeBot()
+    svc = bot.chassis
+
+    # 默认参数 (空转保守: Kp=1/Ki=0.3/Kd=0)
+    svc.set_speed_pid()
+    expect_props = {0x38: 1000, 0x39: 300, 0x3A: 0,    # X: 1.0/0.3/0
+                    0x3B: 1000, 0x3C: 300, 0x3D: 0,    # Y: 1.0/0.3/0
+                    0x3E: 1000, 0x3F: 300, 0x40: 0,    # W: 1.0/0.3/0
+                    0x41: 60, 0x42: 86}                 # 限幅 ±60cm/s ±86°/s
+    check("默认发 11 帧", len(bot.calls) == 11)
+    ok = True
+    for (op, s, inst, prop, val, kw), (p, v) in zip(bot.calls, expect_props.items()):
+        if (op, s, inst) != (Op.SET, 0x04, 0) or prop != p \
+                or int.from_bytes(val, "little") != v:
+            ok = False
+            break
+    check("默认参数帧 (K×1000, 限幅整数)", ok)
+
+    # 自定义参数
+    svc.set_speed_pid(kp_x=1.5, ki_x=0.0, kd_x=0.0,
+                      kp_y=0, ki_y=0, kd_y=0, kp_w=0, ki_w=0, kd_w=0,
+                      out_lim_v=50, out_lim_w=90)
+    check("自定义 Kp_x (0x38=1500)",
+          bot.calls[-11][3] == 0x38
+          and int.from_bytes(bot.calls[-11][4], "little") == 1500)
+    check("自定义限幅 (0x41=50, 0x42=90)",
+          bot.calls[-2][3] == 0x41
+          and int.from_bytes(bot.calls[-2][4], "little") == 50
+          and bot.calls[-1][3] == 0x42
+          and int.from_bytes(bot.calls[-1][4], "little") == 90)
+
+    # 速度上限默认 (0.7 m/s, 3.0 rad/s ≈ 172°/s)
+    svc.set_max_vel()
+    check("set_max_vel 默认 70/172",
+          bot.calls[-2][3] == 0x28
+          and int.from_bytes(bot.calls[-2][4], "little") == 70
+          and bot.calls[-1][3] == 0x29
+          and int.from_bytes(bot.calls[-1][4], "little") == 172)
+
+    # 电机满量程标定 (0x43)
+    svc.set_wheel_full_v(100)
+    check("wheel_full_v 0x43=100",
+          bot.calls[-1][3] == 0x43
+          and int.from_bytes(bot.calls[-1][4], "little") == 100)
+
+
 def test_driver():
     print("[MecanumChassis driver]")
     bot = FakeBot()
@@ -182,6 +230,7 @@ if __name__ == "__main__":
     test_geometry()
     test_control()
     test_state()
+    test_speed_pid()
     test_driver()
     print()
     if FAILURES:

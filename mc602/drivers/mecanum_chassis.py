@@ -153,8 +153,29 @@ class MecanumChassis:
     def set_tolerance(self, pos_cm: float = 2.0, ang_deg: float = 3.0) -> None:
         self._service.set_tolerance(pos_cm, ang_deg)
 
-    def set_max_vel(self, v_cm_s: float = 40.0, w_deg_s: float = 90.0) -> None:
+    def set_max_vel(self, v_cm_s: float = 70.0, w_deg_s: float = 172.0) -> None:
+        """速度上限 (参考 cfg_vehicle.yaml: 0.7 m/s, 3.0 rad/s ≈ 172°/s)。"""
         self._service.set_max_vel(v_cm_s, w_deg_s)
+
+    def set_speed_pid(self, kp_x: float = 1.0, ki_x: float = 0.3,
+                      kd_x: float = 0.0, kp_y: float = 1.0,
+                      ki_y: float = 0.3, kd_y: float = 0.0,
+                      kp_w: float = 1.0, ki_w: float = 0.3,
+                      kd_w: float = 0.0, out_lim_v: float = 60.0,
+                      out_lim_w: float = 86.0) -> None:
+        """车身速度环三轴 PID (固件 200Hz 内环)。
+
+        默认 = 空转保守参数; cfg_vehicle.yaml 参考值 (6/0.3/0.1 等)
+        为贴地车调值, 贴地后跑 speed_loop_eval.py --tune 精调。
+        三轴全 0 → 旁路 (等效开环透传)。
+        out_lim_v: cm/s (±0.6 m/s), out_lim_w: deg/s (±1.5 rad/s)。
+        """
+        self._service.set_speed_pid(kp_x, ki_x, kd_x, kp_y, ki_y, kd_y,
+                                    kp_w, ki_w, kd_w, out_lim_v, out_lim_w)
+
+    def set_wheel_full_v(self, v_cm_s: float = 100.0) -> None:
+        """电机满量程轮速标定 (scale 基准, SDK set_motor(100) = v_cm_s cm/s)。"""
+        self._service.set_wheel_full_v(v_cm_s)
 
     def set_timeout(self, ms: int = 10000) -> None:
         self._service.set_timeout(ms)

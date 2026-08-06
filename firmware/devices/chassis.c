@@ -12,12 +12,11 @@
 
 #include "chassis.h"
 #include "dispatcher.h"
-#include "services.h"   /* motor_encoder / set_motor 由本模块外部提供 */
+#include "services.h"   /* motor_encoder / motor_apply 由本模块外部提供 */
 #include <math.h>
 #include <string.h>
 
 extern int motor_encoder(int port);
-extern void set_motor(int port, int speed);
 
 /* ====================================================================
  * 全局状态
@@ -77,6 +76,23 @@ void chassis_init(void)
     g_ch.kp_alpha = CH_DEF_KP_ALPHA;
     g_ch.kp_beta  = CH_DEF_KP_BETA;
 
+    /* 车身速度环 (pid_x/pid_y/pid_yaw) */
+    g_ch.kp_x   = CH_DEF_KP_X;
+    g_ch.ki_x   = CH_DEF_KI_X;
+    g_ch.kd_x   = CH_DEF_KD_X;
+    g_ch.kp_y   = CH_DEF_KP_Y;
+    g_ch.ki_y   = CH_DEF_KI_Y;
+    g_ch.kd_y   = CH_DEF_KD_Y;
+    g_ch.kp_w   = CH_DEF_KP_W;
+    g_ch.ki_w   = CH_DEF_KI_W;
+    g_ch.kd_w   = CH_DEF_KD_W;
+    g_ch.out_lim_v = CH_DEF_OUT_LIM_V;
+    g_ch.out_lim_w = CH_DEF_OUT_LIM_W;
+    g_ch.wheel_full_v = CH_DEF_WHEEL_FULL_V;
+    g_ch.vx_f = g_ch.vy_f = g_ch.w_f = 0.0f;
+    g_ch.i_x = g_ch.i_y = g_ch.i_w = 0.0f;
+    g_ch.prev_ex = g_ch.prev_ey = g_ch.prev_ew = 0.0f;
+
     /* 容差 / 速度 */
     g_ch.pos_tol   = CH_DEF_POS_TOL;
     g_ch.ang_tol   = CH_DEF_ANG_TOL;
@@ -128,15 +144,50 @@ static void chassis_forward(float w1, float w2, float w3, float w4,
 }
 
 /* ====================================================================
+ * 车身速度环 (pid_x/pid_y/pid_yaw, 参考 cfg_vehicle.yaml)
+ * ==================================================================== */
+
+/* 单轴速度环: 目标 vs 实测(编码器差分) → 限幅后的修正速度。
+ * 抗积分饱和: 积分累积限幅到 "输出限幅 / Ki" (积分项自身不超过限幅)。
+ * 旁路: 三系数全 0 → 目标速度直通, 等效旧版开环透传。 */
+static float speed_axis(float kp, float ki, float kd,
+                        float target, float actual, float dt,
+                        float *iacc, float *prev_err, float out_lim)
+{
+    float err = target - actual;
+    float out;
+
+    if (kp == 0.0f && ki == 0.0f && kd == 0.0f) {
+        /* 旁路: 等效旧版开环透传, 目标速度直通 */
+        *iacc = 0.0f;
+        *prev_err = 0.0f;
+        out = target;
+    } else {
+        if (ki > 0.0f) {
+            *iacc += err * dt;
+            *iacc = clampf(*iacc, -out_lim / ki, out_lim / ki);
+        } else {
+            *iacc = 0.0f;
+        }
+        float deriv = (kd > 0.0f) ? ((err - *prev_err) / dt) : 0.0f;
+        *prev_err = err;
+        out = kp * err + ki * *iacc + kd * deriv;
+    }
+    return clampf(out, -out_lim, out_lim);
+}
+
+/* ====================================================================
  * 增量里程计
  * ==================================================================== */
 
-static void chassis_odometry(int32_t e[4])
+static void chassis_odometry(int32_t e[4],
+                             float *out_dx, float *out_dy, float *out_dw)
 {
     if (!g_ch.has_baseline) {
         /* 首次: 只设基准, 不算位移 (避免瞬移) */
         memcpy(g_ch.last_enc, e, sizeof(g_ch.last_enc));
         g_ch.has_baseline = 1;
+        *out_dx = *out_dy = *out_dw = 0.0f;
         return;
     }
 
@@ -146,20 +197,20 @@ static void chassis_odometry(int32_t e[4])
         g_ch.last_enc[i] = e[i];
     }
 
-    float vx, vy, w;
-    chassis_forward(d[0], d[1], d[2], d[3], &vx, &vy, &w);
+    /* 车体系增量 (cm, rad) — 同时喂里程计与速度环 */
+    chassis_forward(d[0], d[1], d[2], d[3], out_dx, out_dy, out_dw);
 
     /* 用 cos/sin 增量形式更新, 避免每帧 atan2 */
-    float x_inc = vx * g_ch.cos_t - vy * g_ch.sin_t;
-    float y_inc = vx * g_ch.sin_t + vy * g_ch.cos_t;
+    float x_inc = *out_dx * g_ch.cos_t - *out_dy * g_ch.sin_t;
+    float y_inc = *out_dx * g_ch.sin_t + *out_dy * g_ch.cos_t;
     g_ch.x += x_inc;
     g_ch.y += y_inc;
 
-    float new_cos = g_ch.cos_t * cosf(w) - g_ch.sin_t * sinf(w);
-    float new_sin = g_ch.cos_t * sinf(w) + g_ch.sin_t * cosf(w);
+    float new_cos = g_ch.cos_t * cosf(*out_dw) - g_ch.sin_t * sinf(*out_dw);
+    float new_sin = g_ch.cos_t * sinf(*out_dw) + g_ch.sin_t * cosf(*out_dw);
     g_ch.cos_t = new_cos;
     g_ch.sin_t = new_sin;
-    g_ch.theta = wrap_pi(g_ch.theta + w);
+    g_ch.theta = wrap_pi(g_ch.theta + *out_dw);
 
     /* 定期归一化 cos²+sin² 漂移 */
     if (++g_ch.norm_counter >= 1000) {
@@ -172,7 +223,8 @@ static void chassis_odometry(int32_t e[4])
     }
 
     /* 里程统计 (cm×100) */
-    g_ch.distance_cm_x100 += (uint32_t)(sqrtf(vx * vx + vy * vy) * 100.0f);
+    g_ch.distance_cm_x100 += (uint32_t)(sqrtf(*out_dx * *out_dx
+                                            + *out_dy * *out_dy) * 100.0f);
 }
 
 /* ====================================================================
@@ -254,8 +306,14 @@ static void chassis_control_loop(void)
             e[i] = motor_encoder(i + 1);
         }
 
-        /* 里程计 (始终更新, 无论模式) */
-        chassis_odometry(e);
+        /* 车体系增量 (cm/帧, rad/帧) — 里程计 + 速度环共用 */
+        float dx, dy, dw;
+        chassis_odometry(e, &dx, &dy, &dw);
+
+        /* 实测车身速度 (编码器差分 / DT, cm/s, rad/s) */
+        float avx = dx / CH_DT;
+        float avy = dy / CH_DT;
+        float aw  = dw / CH_DT;
 
         float vx = 0.0f, vy = 0.0f, w = 0.0f;
         uint8_t apply = 1;
@@ -336,28 +394,47 @@ static void chassis_control_loop(void)
         }
 
         if (apply) {
+            /* 车身速度环 (200Hz): 目标 vs 实测 → 限幅后的修正指令
+             * 反馈一阶低通: α = dt/(dt+τ) = 5/(5+20) = 0.2 (τ=20ms),
+             * 编码器 5ms 差分噪声 ±10%, 直接反馈会让 PID 输出抖动。 */
+            g_ch.vx_f += 0.2f * (avx - g_ch.vx_f);
+            g_ch.vy_f += 0.2f * (avy - g_ch.vy_f);
+            g_ch.w_f  += 0.2f * (aw  - g_ch.w_f);
+
+            vx = speed_axis(g_ch.kp_x, g_ch.ki_x, g_ch.kd_x, vx, g_ch.vx_f, CH_DT,
+                            &g_ch.i_x, &g_ch.prev_ex, g_ch.out_lim_v);
+            vy = speed_axis(g_ch.kp_y, g_ch.ki_y, g_ch.kd_y, vy, g_ch.vy_f, CH_DT,
+                            &g_ch.i_y, &g_ch.prev_ey, g_ch.out_lim_v);
+            w  = speed_axis(g_ch.kp_w, g_ch.ki_w, g_ch.kd_w, w, g_ch.w_f, CH_DT,
+                            &g_ch.i_w, &g_ch.prev_ew, g_ch.out_lim_w);
+
             /* 逆运动学 → 电机命令 (-100~+100)
-             * scale: TWIST 满量程 100%; GOTO 受 max_speed_cmd 上限限制 */
+             * scale: SDK 标定 1:1 (set_motor(100) = wheel_full_v cm/s);
+             * GOTO 模式额外 clamp 到 max_speed_cmd 上限 */
             float w1, w2, w3, w4;
             chassis_inverse(vx, vy, w, &w1, &w2, &w3, &w4);
 
-            float scale = (g_ch.mode == CH_MODE_TWIST)
-                        ? (100.0f / g_ch.max_v)
-                        : ((float)g_ch.max_speed_cmd / g_ch.max_v);
-            int m1 = (int)clampf(w1 * scale, -100.0f, 100.0f);
-            int m2 = (int)clampf(w2 * scale, -100.0f, 100.0f);
-            int m3 = (int)clampf(w3 * scale, -100.0f, 100.0f);
-            int m4 = (int)clampf(w4 * scale, -100.0f, 100.0f);
+            float k_scale = 100.0f / g_ch.wheel_full_v;
+            int m1 = (int)clampf(w1 * k_scale, -100.0f, 100.0f);
+            int m2 = (int)clampf(w2 * k_scale, -100.0f, 100.0f);
+            int m3 = (int)clampf(w3 * k_scale, -100.0f, 100.0f);
+            int m4 = (int)clampf(w4 * k_scale, -100.0f, 100.0f);
+            if (g_ch.mode == CH_MODE_GOTO) {
+                m1 = (int)clampf((float)m1, -g_ch.max_speed_cmd, g_ch.max_speed_cmd);
+                m2 = (int)clampf((float)m2, -g_ch.max_speed_cmd, g_ch.max_speed_cmd);
+                m3 = (int)clampf((float)m3, -g_ch.max_speed_cmd, g_ch.max_speed_cmd);
+                m4 = (int)clampf((float)m4, -g_ch.max_speed_cmd, g_ch.max_speed_cmd);
+            }
 
-            set_motor(1, m1);
-            set_motor(2, m2);
-            set_motor(3, m3);
-            set_motor(4, m4);
+            motor_apply(1, m1);
+            motor_apply(2, m2);
+            motor_apply(3, m3);
+            motor_apply(4, m4);
         } else if (g_ch.state == CH_EMERGENCY) {
-            set_motor(1, 0);
-            set_motor(2, 0);
-            set_motor(3, 0);
-            set_motor(4, 0);
+            motor_apply(1, 0);
+            motor_apply(2, 0);
+            motor_apply(3, 0);
+            motor_apply(4, 0);
         }
 
         wait(CH_DT);  /* 5ms → 200Hz */
@@ -460,6 +537,19 @@ uint8_t chassis_handler(uint8_t op, uint8_t inst, uint8_t prop,
         case 0x35: /* DIRECT_MAX_W (u16) */
         case 0x36: /* DIRECT_INVERT (u8) */
         case 0x37: /* DIRECT_GAIN (u8) */
+        case 0x38: /* SPD_PID_X_KP */
+        case 0x39: /* SPD_PID_X_KI */
+        case 0x3A: /* SPD_PID_X_KD */
+        case 0x3B: /* SPD_PID_Y_KP */
+        case 0x3C: /* SPD_PID_Y_KI */
+        case 0x3D: /* SPD_PID_Y_KD */
+        case 0x3E: /* SPD_PID_W_KP */
+        case 0x3F: /* SPD_PID_W_KI */
+        case 0x40: /* SPD_PID_W_KD */
+        case 0x41: /* SPD_OUT_LIM_V (u16 cm/s) */
+        case 0x42: /* SPD_OUT_LIM_W (u16 deg/s) */
+        case 0x43: /* WHEEL_FULL_V (u16 cm/s) */
+        case 0x44: /* SPD_DIAG (i16×4: vx_f*100, i_x*1000, out*100, err*100) */
         {
             float *f = NULL;
             switch (prop) {
@@ -469,6 +559,15 @@ uint8_t chassis_handler(uint8_t op, uint8_t inst, uint8_t prop,
             case 0x23: f = &g_ch.ki_rho;   break;
             case 0x24: f = &g_ch.ki_alpha; break;
             case 0x25: f = &g_ch.ki_beta;  break;
+            case 0x38: f = &g_ch.kp_x;     break;
+            case 0x39: f = &g_ch.ki_x;     break;
+            case 0x3A: f = &g_ch.kd_x;     break;
+            case 0x3B: f = &g_ch.kp_y;     break;
+            case 0x3C: f = &g_ch.ki_y;     break;
+            case 0x3D: f = &g_ch.kd_y;     break;
+            case 0x3E: f = &g_ch.kp_w;     break;
+            case 0x3F: f = &g_ch.ki_w;     break;
+            case 0x40: f = &g_ch.kd_w;     break;
             default: break;
             }
             if (f) {
@@ -480,9 +579,31 @@ uint8_t chassis_handler(uint8_t op, uint8_t inst, uint8_t prop,
             } else if (prop == 0x28) {
                 wire_u16(out_data, (uint16_t)g_ch.max_v);
             } else if (prop == 0x29) {
-                wire_u16(out_data, (uint16_t)(g_ch.max_w * 180.0f / (float)M_PI));
+                wire_u16(out_data, (uint16_t)(g_ch.max_w * 180.0f / (float)M_PI + 0.5f));
             } else if (prop == 0x30) {
                 wire_u16(out_data, (uint16_t)g_ch.timeout_ms);
+            } else if (prop == 0x41) {
+                wire_u16(out_data, (uint16_t)g_ch.out_lim_v);
+            } else if (prop == 0x42) {
+                wire_u16(out_data, (uint16_t)(g_ch.out_lim_w * 180.0f / (float)M_PI + 0.5f));
+            } else if (prop == 0x43) {
+                wire_u16(out_data, (uint16_t)g_ch.wheel_full_v);
+            } else if (prop == 0x44) {
+                /* 速度环诊断 (调试): 反馈/积分/输出/误差 */
+                float out_x = g_ch.kp_x * (g_ch.target_vx - g_ch.vx_f)
+                            + g_ch.ki_x * g_ch.i_x;
+                int16_t diag[4] = {
+                    (int16_t)(g_ch.vx_f * 100.0f),
+                    (int16_t)(g_ch.i_x * 1000.0f),
+                    (int16_t)(out_x * 100.0f),
+                    (int16_t)((g_ch.target_vx - g_ch.vx_f) * 100.0f),
+                };
+                for (int i = 0; i < 4; i++) {
+                    out_data[i * 2] = (uint8_t)(diag[i] & 0xFF);
+                    out_data[i * 2 + 1] = (uint8_t)((diag[i] >> 8) & 0xFF);
+                }
+                *out_len = 8;
+                return STATUS_OK;   /* 提前返回, 防公共出口覆盖长度 */
             } else if (prop == 0x32) {
                 out_data[0] = g_ch.direct_mode;
                 *out_len = 1;
@@ -494,7 +615,7 @@ uint8_t chassis_handler(uint8_t op, uint8_t inst, uint8_t prop,
             } else if (prop == 0x34) {
                 wire_u16(out_data, (uint16_t)g_ch.direct_max_v);
             } else if (prop == 0x35) {
-                wire_u16(out_data, (uint16_t)(g_ch.direct_max_w * 180.0f / (float)M_PI));
+                wire_u16(out_data, (uint16_t)(g_ch.direct_max_w * 180.0f / (float)M_PI + 0.5f));
             } else if (prop == 0x36) {
                 out_data[0] = g_ch.direct_invert;
                 *out_len = 1;
@@ -556,6 +677,18 @@ uint8_t chassis_handler(uint8_t op, uint8_t inst, uint8_t prop,
         case 0x35:
         case 0x36:
         case 0x37:
+        case 0x38:
+        case 0x39:
+        case 0x3A:
+        case 0x3B:
+        case 0x3C:
+        case 0x3D:
+        case 0x3E:
+        case 0x3F:
+        case 0x40:
+        case 0x41:
+        case 0x42:
+        case 0x43:
         {
             if (in_len < 2) return STATUS_RANGE_ERR;
             uint16_t v = (uint16_t)(in_data[0] | (in_data[1] << 8));
@@ -577,6 +710,18 @@ uint8_t chassis_handler(uint8_t op, uint8_t inst, uint8_t prop,
             case 0x35: g_ch.direct_max_w = v * (float)M_PI / 180.0f; break;
             case 0x36: g_ch.direct_invert = (uint8_t)v; break;
             case 0x37: g_ch.direct_gain = (uint8_t)v; break;
+            case 0x38: g_ch.kp_x   = v / 1000.0f; break;
+            case 0x39: g_ch.ki_x   = v / 1000.0f; break;
+            case 0x3A: g_ch.kd_x   = v / 1000.0f; break;
+            case 0x3B: g_ch.kp_y   = v / 1000.0f; break;
+            case 0x3C: g_ch.ki_y   = v / 1000.0f; break;
+            case 0x3D: g_ch.kd_y   = v / 1000.0f; break;
+            case 0x3E: g_ch.kp_w   = v / 1000.0f; break;
+            case 0x3F: g_ch.ki_w   = v / 1000.0f; break;
+            case 0x40: g_ch.kd_w   = v / 1000.0f; break;
+            case 0x41: g_ch.out_lim_v = (float)v;  break;
+            case 0x42: g_ch.out_lim_w = v * (float)M_PI / 180.0f; break;
+            case 0x43: g_ch.wheel_full_v = (float)v; break;
             }
             *out_len = 0;
             return STATUS_OK;
@@ -607,17 +752,23 @@ uint8_t chassis_handler(uint8_t op, uint8_t inst, uint8_t prop,
         case 0x81: /* ABORT */
             g_ch.mode = CH_MODE_OFF;
             g_ch.state = CH_ABORTED;
-            set_motor(1, 0);
-            set_motor(2, 0);
-            set_motor(3, 0);
-            set_motor(4, 0);
+            motor_apply(1, 0);
+            motor_apply(2, 0);
+            motor_apply(3, 0);
+            motor_apply(4, 0);
             *out_len = 0;
             return STATUS_OK;
         case 0x82: { /* SET_TWIST: i16×3 (vx*100, vy*100, ω*1000) */
             if (in_len < 6) return STATUS_RANGE_ERR;
-            g_ch.target_vx = (float)(int16_t)(in_data[0] | (in_data[1] << 8)) / 100.0f;
-            g_ch.target_vy = (float)(int16_t)(in_data[2] | (in_data[3] << 8)) / 100.0f;
-            g_ch.target_w  = (float)(int16_t)(in_data[4] | (in_data[5] << 8)) / 1000.0f;
+            g_ch.target_vx = clampf((float)(int16_t)(in_data[0] | (in_data[1] << 8)) / 100.0f,
+                                    -g_ch.max_v, g_ch.max_v);
+            g_ch.target_vy = clampf((float)(int16_t)(in_data[2] | (in_data[3] << 8)) / 100.0f,
+                                    -g_ch.max_v, g_ch.max_v);
+            g_ch.target_w  = clampf((float)(int16_t)(in_data[4] | (in_data[5] << 8)) / 1000.0f,
+                                    -g_ch.max_w, g_ch.max_w);
+            /* 新目标 → 清速度环积分/微分 (防跨目标 windup) */
+            g_ch.i_x = g_ch.i_y = g_ch.i_w = 0.0f;
+            g_ch.prev_ex = g_ch.prev_ey = g_ch.prev_ew = 0.0f;
             g_ch.state = CH_RUNNING;
             g_ch.mode = CH_MODE_TWIST;
             *out_len = 0;
@@ -631,10 +782,10 @@ uint8_t chassis_handler(uint8_t op, uint8_t inst, uint8_t prop,
             } else {
                 g_ch.mode = CH_MODE_OFF;
                 g_ch.state = CH_IDLE;
-                set_motor(1, 0);
-                set_motor(2, 0);
-                set_motor(3, 0);
-                set_motor(4, 0);
+                motor_apply(1, 0);
+                motor_apply(2, 0);
+                motor_apply(3, 0);
+                motor_apply(4, 0);
             }
             *out_len = 0;
             return STATUS_OK;
@@ -651,10 +802,10 @@ uint8_t chassis_handler(uint8_t op, uint8_t inst, uint8_t prop,
         case 0x84: /* EMERGENCY_STOP */
             g_ch.mode = CH_MODE_OFF;
             g_ch.state = CH_EMERGENCY;
-            set_motor(1, 0);
-            set_motor(2, 0);
-            set_motor(3, 0);
-            set_motor(4, 0);
+            motor_apply(1, 0);
+            motor_apply(2, 0);
+            motor_apply(3, 0);
+            motor_apply(4, 0);
             *out_len = 0;
             return STATUS_OK;
         case 0x85: /* CLEAR_ERROR */

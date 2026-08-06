@@ -36,6 +36,25 @@ extern volatile int step_bus_busy;
 
 static MotorPID motor_pid[MOTOR_MAX];
 
+/* ====================================================================
+ * 电机目标共享表 — 单一 set_motor 写线程 (pid_control_loop)
+ *
+ * 架构原则: 一个资源 = 一个写线程。
+ * MotorService / Chassis 等业务线程只写目标表 (motor_apply),
+ * 不直接调 SDK set_motor —— 否则多线程抢同一硬件 (历史 bug:
+ * 底盘 200Hz 环与 PID 环交替写 set_motor → 电机目标被互相覆盖)。
+ * ==================================================================== */
+
+static volatile int g_motor_target[MOTOR_MAX];
+
+void motor_apply(int port, int speed)
+{
+    if (port < 1 || port > MOTOR_MAX) return;
+    if (speed >  100) speed =  100;
+    if (speed < -100) speed = -100;
+    g_motor_target[port - 1] = speed;
+}
+
 /**
  * PID 控制线程 — 每 5ms 运行一次。
  * 对每个电机：读 target → set_motor() (交给 SDK 闭环 PID)
@@ -46,14 +65,10 @@ static MotorPID motor_pid[MOTOR_MAX];
 static void pid_control_loop(void)
 {
     while (1) {
+        /* 唯一调 set_motor 的地方: 无条件把共享目标表喂给 SDK
+         * (OFF 电机目标为 0, 保持停车; 5ms 喂一次避免 SDK 停转保护) */
         for (int i = 0; i < MOTOR_MAX; i++) {
-            MotorPID *pid = &motor_pid[i];
-            if (pid->mode == PID_MODE_OFF) continue;
-
-            /* passthrough: 直接用 target 喂 SDK PID, 不做本地 PID 计算.
-             * 这样避免双层套叠 (我们 PID + SDK PID) 以及 unit mismatch.
-             * SDK 的内置 PID 是原厂调教, 性能 CV≈10%. */
-            set_motor(i + 1, pid->target_speed);
+            set_motor(i + 1, g_motor_target[i]);
         }
         wait(0.005);  /* 5ms → 200Hz 轮询 (避免 SDK 1s 不喂停转保护) */
     }
@@ -102,6 +117,21 @@ static uint8_t system_handler(uint8_t op, uint8_t inst, uint8_t prop,
             out_data[0] = (uint8_t)(sys_watchdog_ms & 0xFF);
             out_data[1] = (uint8_t)((sys_watchdog_ms >> 8) & 0xFF);
             *out_len = 2;
+            return STATUS_OK;
+        }
+        case 0x0A: { /* rx_stats (u32×3: valid, crc_err, ring_overflow) */
+            extern volatile uint32_t g_rx_stats_valid;
+            extern volatile uint32_t g_rx_stats_crc;
+            extern volatile uint32_t g_rx_stats_overflow;
+            uint32_t st[3] = { g_rx_stats_valid, g_rx_stats_crc,
+                               g_rx_stats_overflow };
+            for (int i = 0; i < 3; i++) {
+                out_data[i * 4 + 0] = (uint8_t)(st[i] & 0xFF);
+                out_data[i * 4 + 1] = (uint8_t)((st[i] >> 8) & 0xFF);
+                out_data[i * 4 + 2] = (uint8_t)((st[i] >> 16) & 0xFF);
+                out_data[i * 4 + 3] = (uint8_t)((st[i] >> 24) & 0xFF);
+            }
+            *out_len = 12;
             return STATUS_OK;
         }
         default:
@@ -263,9 +293,10 @@ static uint8_t motor_handler(uint8_t op, uint8_t inst, uint8_t prop,
                 if (spd >  100) spd =  100;
                 if (spd == 0) {
                     pid_stop(pid);
-                    set_motor(port, 0);
+                    motor_apply(port, 0);
                 } else {
                     pid_set_speed(pid, spd);
+                    motor_apply(port, spd);
                 }
             }
             *out_len = 0;
@@ -294,7 +325,7 @@ static uint8_t motor_handler(uint8_t op, uint8_t inst, uint8_t prop,
                 uint8_t mode = in_data[0];
                 if (mode == PID_MODE_OFF) {
                     pid_stop(pid);
-                    set_motor(port, 0);
+                    motor_apply(port, 0);
                 }
                 /* SPEED/POSITION 模式由 set_speed/set_position 自动切换 */
             }
@@ -342,7 +373,7 @@ static uint8_t motor_handler(uint8_t op, uint8_t inst, uint8_t prop,
         switch (prop) {
         case 0x80: /* stop */
             pid_stop(pid);
-            set_motor(port, 0);
+            motor_apply(port, 0);
             *out_len = 0;
             return STATUS_OK;
         case 0x81: /* reset_encoder */
@@ -500,9 +531,10 @@ static uint8_t mecanum_group_handler(uint8_t op, uint8_t inst, uint8_t prop,
                 if (spd >  100) spd =  100;
                 if (spd == 0) {
                     pid_stop(pid);
-                    set_motor(i + 1, 0);
+                    motor_apply(i + 1, 0);
                 } else {
                     pid_set_speed(pid, spd);
+                    motor_apply(i + 1, spd);
                 }
             }
             *out_len = 0;
@@ -517,7 +549,7 @@ static uint8_t mecanum_group_handler(uint8_t op, uint8_t inst, uint8_t prop,
         case 0x80: { /* stop_all */
             for (int i = 0; i < 4; i++) {
                 pid_stop(&motor_pid[i]);
-                set_motor(i + 1, 0);
+                motor_apply(i + 1, 0);
             }
             *out_len = 0;
             return STATUS_OK;

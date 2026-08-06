@@ -179,7 +179,8 @@ class MC602:
             self._apply_geometry({
                 "track": 30.0, "wheel_base": 28.0, "wheel_radius": 3.0,
                 "encoder_ppr": 2048, "roller_adjust": 1.052,
-                "max_v": 60.0, "max_w": 0.8,
+                "max_v": 70.0, "max_w": 3.0,   # cfg_vehicle.yaml 参考
+                "wheel_full_v": 100.0,           # SDK set_motor 1:1 标定
             })
             return
         raise ValueError(f"未知配置档: {profile}")
@@ -199,6 +200,9 @@ class MC602:
                 v_cm_s=cfg.get("max_v", 40.0),
                 w_deg_s=cfg.get("max_w", 90.0) * 180 / 3.14159,
             )
+        if "wheel_full_v" in cfg:
+            ch.set_wheel_full_v(v_cm_s=cfg["wheel_full_v"])
+        time.sleep(0.05)  # 固件 UART handler 喘息窗口 (连续帧易丢)
 
 
     def open(self) -> None:
@@ -304,8 +308,16 @@ class MC602:
                     continue
                 payload = try_decode_frame(self._rx_buf)
                 if payload is None:
-                    if len(self._rx_buf) > 1024:
-                        self._rx_buf.pop(0)
+                    # 坏帧处理: 已含完整帧结构 (0x00+CRC) 但校验失败 →
+                    # 丢弃该帧, 避免卡住缓冲头导致后续响应全部堵死
+                    # (1Mbps 无校验偶发 bit 错, 实测会连续超时)。
+                    # 无 0x00 分隔符 → 半包, 等更多字节。
+                    try:
+                        delim = bytes(self._rx_buf).index(0x00)
+                    except ValueError:
+                        continue
+                    if delim + 1 < len(self._rx_buf):
+                        del self._rx_buf[:delim + 2]
                     continue
                 frame_end = bytes(self._rx_buf).index(0x00) + 2
                 if frame_end > len(self._rx_buf):
@@ -322,7 +334,7 @@ class MC602:
     def _request(self, op: Op, svc: int, inst: int, prop: int,
                  value: bytes = b"",
                  timeout: float = 2.0,
-                 retry: int = 1,
+                 retry: int = 2,
                  retry_delay: float = 0.1) -> Payload:
         """发送一帧请求, 等待响应, 可选自动重试.
 

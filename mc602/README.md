@@ -87,6 +87,11 @@ car.update()                              # 读编码器 → 里程计
 car.pose                                  # Pose2D (cm, rad)
 car.distance                              # 总里程 cm
 car.reset_pose()                          # 归零
+car.set_speed_pid()                       # 车身速度环三轴 PID (固件 200Hz)
+                                          #   默认 = cfg_vehicle.yaml 参考值
+                                          #   (6/0.3/0.1, 8/0.3/0.1, 10/0.2/0.1,
+                                          #    限幅 ±60cm/s ±86°/s; 全 0 = 旁路)
+car.set_max_vel(70, 172)                  # 速度上限 (0.7 m/s, 3.0 rad/s)
 ```
 
 ### 蓝牙手柄
