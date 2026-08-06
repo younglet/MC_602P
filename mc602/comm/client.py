@@ -308,16 +308,8 @@ class MC602:
                     continue
                 payload = try_decode_frame(self._rx_buf)
                 if payload is None:
-                    # 坏帧处理: 已含完整帧结构 (0x00+CRC) 但校验失败 →
-                    # 丢弃该帧, 避免卡住缓冲头导致后续响应全部堵死
-                    # (1Mbps 无校验偶发 bit 错, 实测会连续超时)。
-                    # 无 0x00 分隔符 → 半包, 等更多字节。
-                    try:
-                        delim = bytes(self._rx_buf).index(0x00)
-                    except ValueError:
-                        continue
-                    if delim + 1 < len(self._rx_buf):
-                        del self._rx_buf[:delim + 2]
+                    if len(self._rx_buf) > 1024:
+                        self._rx_buf.pop(0)
                     continue
                 frame_end = bytes(self._rx_buf).index(0x00) + 2
                 if frame_end > len(self._rx_buf):
@@ -334,7 +326,7 @@ class MC602:
     def _request(self, op: Op, svc: int, inst: int, prop: int,
                  value: bytes = b"",
                  timeout: float = 2.0,
-                 retry: int = 2,
+                 retry: int = 1,
                  retry_delay: float = 0.1) -> Payload:
         """发送一帧请求, 等待响应, 可选自动重试.
 

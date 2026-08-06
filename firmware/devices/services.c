@@ -119,21 +119,6 @@ static uint8_t system_handler(uint8_t op, uint8_t inst, uint8_t prop,
             *out_len = 2;
             return STATUS_OK;
         }
-        case 0x0A: { /* rx_stats (u32×3: valid, crc_err, ring_overflow) */
-            extern volatile uint32_t g_rx_stats_valid;
-            extern volatile uint32_t g_rx_stats_crc;
-            extern volatile uint32_t g_rx_stats_overflow;
-            uint32_t st[3] = { g_rx_stats_valid, g_rx_stats_crc,
-                               g_rx_stats_overflow };
-            for (int i = 0; i < 3; i++) {
-                out_data[i * 4 + 0] = (uint8_t)(st[i] & 0xFF);
-                out_data[i * 4 + 1] = (uint8_t)((st[i] >> 8) & 0xFF);
-                out_data[i * 4 + 2] = (uint8_t)((st[i] >> 16) & 0xFF);
-                out_data[i * 4 + 3] = (uint8_t)((st[i] >> 24) & 0xFF);
-            }
-            *out_len = 12;
-            return STATUS_OK;
-        }
         default:
             return STATUS_NOT_FOUND;
         }

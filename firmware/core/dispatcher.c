@@ -56,27 +56,7 @@ static ServiceEntry *find_service(uint8_t svc_id)
  * RX/TX 缓冲区
  * ==================================================================== */
 
-/* ====================================================================
- * RX/TX 缓冲区
- * ==================================================================== */
-
-/* 环形缓冲: ISR 只入环 (极简 ~10 指令), 状态机/解码全在 rx_handle 线程。
- * 1Mbps = 125 字节/ms, rx_handle 每 1ms poll, 256 深度足够。
- * 单生产者(ISR)单消费者(rx_handle), 无锁。
- * 历史: 旧实现 ISR 里做 PING 匹配+帧收集, 处理耗时偶发 >1µs/字节
- * (STM32F103 USART 无 FIFO) → 硬件 ORE 溢出丢字节 → 协议偶发超时。 */
-#define RX_RING_SIZE 512
-static volatile uint8_t  rx_ring[RX_RING_SIZE];
-static volatile uint16_t rx_ring_head = 0;
-static volatile uint16_t rx_ring_tail = 0;
-static volatile uint8_t  rx_ring_overflow = 0;  /* 溢出兜底标志 */
-
-/* RX 统计 (诊断用, System 0x0A GET) */
-volatile uint32_t g_rx_stats_valid = 0;    /* 有效帧 */
-volatile uint32_t g_rx_stats_crc = 0;      /* CRC 错帧 */
-volatile uint32_t g_rx_stats_overflow = 0; /* ring 溢出 */
-
-static uint8_t rx_buf[RX_BUF_SIZE];   /* 当前帧 (仅 rx_handle 线程访问) */
+static uint8_t rx_buf[RX_BUF_SIZE];   /* COBS 编码的原始帧 */
 static uint8_t payload_buf[MAX_PAYLOAD]; /* 解码后的 payload */
 static uint8_t tx_payload[MAX_PAYLOAD]; /* 响应 payload */
 
@@ -182,11 +162,12 @@ static void process_payload(const uint8_t *payload, uint8_t len)
 }
 
 /* ====================================================================
- * 接收状态机 (rx_handle 线程内, 非中断)
+ * 接收状态机
  * ==================================================================== */
 
-static uint8_t flag_handle = 0;
-static uint16_t rx_idx = 0;
+static volatile uint8_t flag_handle = 0;
+
+static volatile uint16_t rx_idx = 0;
 static float time_last = 0;
 static uint8_t ping_flag = 0;
 static uint8_t ping_idx = 0;
@@ -205,9 +186,77 @@ uint8_t get_ping_status(void)
     return ping_status;
 }
 
-/* 逐字节接收状态机 (原 UART ISR 逻辑, 移入线程避免 1µs 硬实时) */
-static void rx_feed_byte(uint8_t byte)
+/* ====================================================================
+ * 接收线程
+ * ==================================================================== */
+
+static void rx_handle(void)
 {
+    while (1) {
+        if (flag_handle == 1) {
+            /* 临界区: 在这里 UART 中断不能写 rx_buf, 也不能改 time_last / ping_*
+             * 临界区只能包含读 rx_buf + 复制到 payload_buf + CRC 校验 + 清状态.
+             * process_payload (调 set_motor 等) 耗时, 必须在临界区外.
+             *
+             * 用 __disable_irq() 而非 taskENTER_CRITICAL() 因为 UART 中断优先级=0
+             * 高于 configMAX_SYSCALL_INTERRUPT_PRIORITY (默认 5),
+             * taskENTER_CRITICAL() 不会阻塞 UART 中断! */
+            size_t payload_len = 0;
+            int valid = 0;
+
+            __disable_irq();
+            {
+                uint8_t *frame_start = rx_buf;
+                uint16_t frame_len   = rx_idx;
+
+                /* 查找分隔符 0x00 */
+                int delim_pos = -1;
+                for (uint16_t i = 0; i < frame_len; i++) {
+                    if (frame_start[i] == FRAME_DELIMITER) {
+                        delim_pos = (int)i;
+                        break;
+                    }
+                }
+
+                if (delim_pos >= 0 && delim_pos + 1 < (int)frame_len) {
+                    /* COBS 解码 (写入 payload_buf) */
+                    payload_len = cobs_decode(frame_start, (size_t)delim_pos,
+                                              payload_buf);
+                    if (payload_len > 0 || delim_pos <= 1) {
+                        /* CRC8 校验 */
+                        uint8_t expected_crc = frame_start[delim_pos + 1];
+                        uint8_t actual_crc   = crc8_compute(payload_buf, payload_len);
+                        if (expected_crc == actual_crc) {
+                            valid = 1;
+                        }
+                    }
+                }
+
+                /* 清状态, 让 UART ISR 重新从 0 开始接收下一帧.
+                 * 关键: 这一步必须在临界区内, 否则会被 ISR 写进去的新字节覆盖 */
+                flag_handle = 0;
+                rx_idx = 0;
+            }
+            __enable_irq();
+
+            /* 临界区外处理: process_payload 会调 set_motor (耗时几 ms),
+             * 在里面关中断会丢 UART 字节 */
+            if (valid) {
+                process_payload(payload_buf, (uint8_t)payload_len);
+            }
+        }
+        wait(0.001);
+    }
+}
+
+/* ====================================================================
+ * 串口中断回调
+ * ==================================================================== */
+
+static void Uart_RevCallback(int revdata)
+{
+    uint8_t byte = (uint8_t)revdata;
+
     /* 100ms 超时自动复位接收状态 */
     if (seconds() - time_last > 0.1) {
         rx_idx = 0;
@@ -216,10 +265,7 @@ static void rx_feed_byte(uint8_t byte)
     }
     time_last = seconds();
 
-    /* PING 检测：收到 0x55 或已在 PING 序列中才继续匹配
-     * ⚠️ 匹配过程中的字节不能 return 吞掉 —— 数据帧里的 0x55
-     * (如 SET 0x29 的 value=85=0x55) 必须照常进入数据接收,
-     * 否则帧缺字节 → CRC 错 → 请求被丢弃 (表现为随机超时)。 */
+    /* PING 检测：收到 0x55 或已在 PING 序列中才继续匹配 */
     if (ping_flag || byte == 0x55) {
         if (byte == PING_DATA[ping_idx]) {
             ping_flag = 1;
@@ -228,118 +274,31 @@ static void rx_feed_byte(uint8_t byte)
                 ping_status = 1;
                 ping_flag = 0;
                 ping_idx = 0;
-                /* 复位由主循环消费 ping_status 触发 */
             }
+            return;  /* PING 匹配中，不进入数据接收 */
         } else {
             /* 不匹配，退出 PING 模式 */
             ping_flag = 0;
             ping_idx = 0;
+            /* 继续进入数据接收 */
         }
     }
 
-    /* 数据接收 (PING 序列字节也照常进入, 形成无效帧被 CRC 丢弃) */
+    /* 数据接收 */
     if (rx_idx < RX_BUF_SIZE) {
         rx_buf[rx_idx++] = byte;
 
         /* 检测到帧分隔符 0x00 */
         if (byte == FRAME_DELIMITER) {
             flag_handle = 1;
-            /* 收到正常 COBS 帧后清零 PING 状态，防止误触发复位。
-             * ⚠️ 但 PING 帧第 3/6/7 字节本身就是 0x00 (PING_DATA[2/5/6]),
-             * 此时 ping_idx 已 ≥3, 若也清零则 PING 永远匹配不完。
-             * 规则: ping_idx < 3 (仅匹配到 0x55 0xaa) 才清零 ——
-             * COBS 编码区不含 0x00, 合法数据帧的 0x00 必然在首 3 字节内。 */
-            if (ping_idx < 3) {
-                ping_flag = 0;
-                ping_idx = 0;
-            }
+            /* 收到正常 COBS 帧后清零 PING 状态，防止误触发复位 */
+            ping_flag = 0;
+            ping_idx = 0;
         }
     } else {
         /* 缓冲区溢出，重置 */
         rx_idx = 0;
     }
-}
-
-/* ====================================================================
- * 接收线程
- * ==================================================================== */
-
-static void rx_handle(void)
-{
-    while (1) {
-        /* 消费环形缓冲 (ISR 只入环), 逐帧立即处理:
-         * 分隔符一到就处理该帧, 否则多帧累积时后帧被 rx_idx 清零截断
-         * (历史 bug: 一帧残头 + CRC 错, 实测每轮连发丢 1 帧)。
-         * process_payload 耗时期间 ring 继续收 (512 深度 ≈ 4ms 缓冲)。 */
-        while (rx_ring_head != rx_ring_tail) {
-            uint8_t byte = rx_ring[rx_ring_tail];
-            rx_ring_tail = (uint16_t)((rx_ring_tail + 1) & (RX_RING_SIZE - 1));
-            rx_feed_byte(byte);
-
-            if (flag_handle == 1) {
-                size_t payload_len = 0;
-                int valid = 0;
-
-                /* 查找分隔符 0x00 */
-                int delim_pos = -1;
-                for (uint16_t i = 0; i < rx_idx; i++) {
-                    if (rx_buf[i] == FRAME_DELIMITER) {
-                        delim_pos = (int)i;
-                        break;
-                    }
-                }
-
-                /* CRC 字节 (分隔符后 1 字节) 未到齐 → 继续消费 ring,
-                 * 分隔符刚处理完时 CRC 通常还在 ring 里。 */
-                if (delim_pos < 0 || delim_pos + 1 >= (int)rx_idx) {
-                    continue;
-                }
-
-                /* COBS 解码 (写入 payload_buf) */
-                payload_len = cobs_decode(rx_buf, (size_t)delim_pos,
-                                          payload_buf);
-                if (payload_len > 0 || delim_pos <= 1) {
-                    /* CRC8 校验 */
-                    uint8_t expected_crc = rx_buf[delim_pos + 1];
-                    uint8_t actual_crc   = crc8_compute(payload_buf, payload_len);
-                    if (expected_crc == actual_crc) {
-                        valid = 1;
-                    }
-                }
-
-                /* 清状态, 后续字节属于新帧 */
-                flag_handle = 0;
-                rx_idx = 0;
-
-                if (valid) {
-                    g_rx_stats_valid++;
-                } else if (delim_pos >= 0) {
-                    g_rx_stats_crc++;   /* 有帧结构但校验失败 */
-                }
-
-                if (valid) {
-                    process_payload(payload_buf, (uint8_t)payload_len);
-                }
-            }
-        }
-        wait(0.001);
-    }
-}
-
-/* ====================================================================
- * 串口中断回调 (极简: 只入环形缓冲)
- * ==================================================================== */
-
-static void Uart_RevCallback(int revdata)
-{
-    uint16_t next = (uint16_t)((rx_ring_head + 1) & (RX_RING_SIZE - 1));
-    if (next == rx_ring_tail) {
-        rx_ring_overflow = 1;   /* 环形缓冲满: 丢字节 (正常不应发生) */
-        g_rx_stats_overflow++;
-        return;
-    }
-    rx_ring[rx_ring_head] = (uint8_t)revdata;
-    rx_ring_head = next;
 }
 
 /* ====================================================================
