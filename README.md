@@ -31,13 +31,15 @@ PING 慢帧会自动触发旧固件复位，**不需要手动按按钮**。
 ```bash
 # 纯单元测试 (无需硬件)
 python mc602/tests/test_protocol_unit.py
+python mc602/tests/test_stepper_unit.py
+python mc602/tests/test_servo_unit.py
+python mc602/tests/test_chassis_unit.py
 
 # 实机评测 (需要固件已烧录)
-python mc602/examples/m1_spin_demo.py
-python mc602/examples/m1_pid_eval.py
-python mc602/examples/mecanum_4motor_eval.py
-python mc602/examples/stability_5x5_eval.py
-python mc602/examples/test_m1.py
+python mc602/examples/pad_mecanum.py         # 蓝牙手柄直读遥控 (固件模式)
+python mc602/examples/pad_web_map.py         # Web 遥控 + 实时地图
+python mc602/examples/chassis_calibrate.py   # 底盘标定
+python mc602/tests/test_mecanum_full.py      # 4 路电机全面评测
 ```
 
 ## 关键文档
