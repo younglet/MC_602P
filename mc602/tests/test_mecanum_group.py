@@ -1,3 +1,4 @@
+# [实机评测] 需要硬件
 """
 mecanum_group_eval.py — MotorsService 组控性能评测
 

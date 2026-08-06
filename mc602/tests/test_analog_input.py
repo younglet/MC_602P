@@ -1,3 +1,4 @@
+# [实机评测] 需要硬件
 """
 analog_input_test.py — 模拟输入评测 (A1~A6 + AI1~AI3, 共 9 路)
 

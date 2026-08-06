@@ -1,3 +1,4 @@
+# [实机评测] 需要硬件
 """
 digital_io_test.py — 数字 IO 评测 (P1~P6 + D1~D7)
 
