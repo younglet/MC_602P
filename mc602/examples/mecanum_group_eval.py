@@ -1,5 +1,5 @@
 """
-test_mecanum_group.py — MotorsService 组控性能测试
+mecanum_group_eval.py — MotorsService 组控性能评测
 
 验证固件 service 0x02 (mecanum_group_handler) 与 Python MotorsService.
 重点测:

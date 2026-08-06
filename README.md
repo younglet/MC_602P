@@ -39,7 +39,7 @@ python mc602/tests/test_chassis_unit.py
 python mc602/examples/pad_mecanum.py         # 蓝牙手柄直读遥控 (固件模式)
 python mc602/examples/pad_web_map.py         # Web 遥控 + 实时地图
 python mc602/examples/chassis_calibrate.py   # 底盘标定
-python mc602/tests/test_mecanum_full.py      # 4 路电机全面评测
+python mc602/examples/mecanum_full_eval.py   # 4 路电机全面评测
 ```
 
 ## 关键文档
