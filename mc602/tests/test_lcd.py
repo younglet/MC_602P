@@ -14,7 +14,7 @@ import time
 grandparent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, grandparent_dir)
 
-from mc602 import MC602, SerialNotFoundError, ConnectionError
+from mc602 import Robot, SerialNotFoundError, ConnectionError
 
 
 def main() -> int:
@@ -23,18 +23,19 @@ def main() -> int:
     print("=" * 50)
 
     try:
-        bot = MC602.connect()
+        robot = Robot.connect()
     except (SerialNotFoundError, ConnectionError) as e:
         print(f"[!] {e}")
         return 1
 
     with bot:
-        print(f"[OK] {bot._port_name}, FW={bot.system.version}")
+        print(f"[OK] {robot.bot._port_name}, FW={robot.bot.system.version}")
+        lcd = robot.lcd                  # ← per-instance driver
         print(f"[   ] 等 2 秒 (心跳刷屏中, 屏幕应有电压/心跳信息) ...")
         time.sleep(2)
 
         print(f"[   ] 写屏: 'test' ...")
-        bot.lcd.show_line(2, "test")
+        lcd.show_line(2, "test")
 
         print(f"[   ] 等待 3 秒, 观察屏幕:")
         print(f"      - 第 2 行显示 'test'")
@@ -43,7 +44,7 @@ def main() -> int:
         time.sleep(3)
 
         print(f"[   ] 恢复心跳刷新 ...")
-        bot.lcd.auto()
+        lcd.auto()
         print(f"[PASS] 完成")
         return 0
 

@@ -15,7 +15,7 @@ import time
 grandparent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, grandparent_dir)
 
-from mc602 import MC602, SerialNotFoundError, ConnectionError
+from mc602 import Robot, SerialNotFoundError, ConnectionError
 
 PORTS = ["D1", "D2", "D3", "D4", "D5", "D6", "D7"]
 STEPS = [0, 25, 50, 75, 100, 75, 50, 25, 0]
@@ -29,7 +29,7 @@ def main() -> int:
     print("=" * 55)
 
     try:
-        bot = MC602.connect()
+        robot = Robot.connect()
     except (SerialNotFoundError, ConnectionError) as e:
         print(f"[!] {e}")
         return 1
@@ -38,12 +38,13 @@ def main() -> int:
         print(f"[OK] {bot._port_name}, FW={bot.system.version}\n")
         all_ok = True
         for port in PORTS:
+            pwm = robot.pwm(port)        # ← per-instance driver
             print(f"--- {port} ---")
             ok = True
             for step in STEPS:
-                bot.servo_pwm.set_duty(port, step)
+                pwm.set_duty(step)
                 time.sleep(HOLD)
-                got = bot.servo_pwm.get_duty(port)
+                got = pwm.duty
                 mark = "OK" if abs(got - step) <= TOLLERANCE else "FAIL"
                 if mark == "FAIL":
                     ok = False

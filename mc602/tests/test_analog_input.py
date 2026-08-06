@@ -15,7 +15,7 @@ import time
 grandparent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, grandparent_dir)
 
-from mc602 import MC602, SerialNotFoundError, ConnectionError
+from mc602 import Robot, SerialNotFoundError, ConnectionError
 
 PORTS = [f"A{i}" for i in range(1, 7)] + [f"AI{i}" for i in range(1, 4)]
 SAMPLES = 10
@@ -27,15 +27,15 @@ def main() -> int:
     print("=" * 55)
 
     try:
-        bot = MC602.connect()
+        robot = Robot.connect()
     except (SerialNotFoundError, ConnectionError) as e:
         print(f"[!] {e}")
         return 1
 
     with bot:
-        print(f"[OK] {bot._port_name}, FW={bot.system.version}\n")
+        print(f"[OK] {robot.bot._port_name}, FW={robot.bot.system.version}\n")
         for port in PORTS:
-            a = bot.analog(port)
+            a = robot.analog(port)
             vals = [a.read() for _ in range(SAMPLES)]
             avg = sum(vals) / len(vals)
             spread = max(vals) - min(vals)

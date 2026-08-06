@@ -51,9 +51,9 @@ def _setup_motor(bot, port: int, target: int) -> None:
     """带重试的 reset_encoder + set_speed"""
     for attempt in range(SETUP_RETRY):
         try:
-            bot.motor.reset_encoder(port)
+            motors[port].reset_encoder()
             time.sleep(0.03)
-            bot.motor.set_speed(port, target)
+            motors[port].set_speed(target)
             return
         except Exception:
             if attempt == SETUP_RETRY - 1:
@@ -66,7 +66,7 @@ def _stop_all(bot, *ports) -> None:
     for p in ports:
         for _ in range(STOP_RETRY):
             try:
-                bot.motor.stop(p)
+                motors[p].stop()
                 break
             except Exception:
                 time.sleep(0.05)
@@ -99,7 +99,7 @@ def sample_one(bot, port: int, target: int, duration: float, dt: float
             continue
         time.sleep(INTER_CALL)
         try:
-            enc = bot.motor.get_encoder(port)
+            enc = motors[port].encoder
         except Exception:
             n_timeouts += 1
             time.sleep(0.04)
@@ -118,7 +118,7 @@ def sample_one(bot, port: int, target: int, duration: float, dt: float
 
     # stop
     try:
-        bot.motor.stop(port)
+        motors[port].stop()
     except Exception:
         pass
 
@@ -410,7 +410,7 @@ def test_direction_flip(bot) -> dict:
         time.sleep(0.3)
         # 加额外恢复期, 等电机完全停下
         try:
-            bot.motor.stop(port)
+            motors[port].stop()
         except Exception:
             pass
         time.sleep(0.2)
@@ -474,7 +474,7 @@ def test_sustained(bot) -> dict:
                 continue
             time.sleep(INTER_CALL)
             try:
-                enc = bot.motor.get_encoder(port)
+                enc = motors[port].encoder
             except Exception:
                 seg_to += 1
                 time.sleep(0.04)
@@ -493,7 +493,7 @@ def test_sustained(bot) -> dict:
         segments.append(seg_samples)
 
     try:
-        bot.motor.stop(port)
+        motors[port].stop()
     except Exception:
         pass
 
@@ -564,7 +564,7 @@ def test_crosstalk(bot) -> dict:
 
         for port in [M1, M2, M3, M4]:
             try:
-                enc = bot.motor.get_encoder(port)
+                enc = motors[port].encoder
             except Exception:
                 n_to += 1
                 continue  # 不记假采样
@@ -628,13 +628,14 @@ def main() -> int:
     print(f"  预计耗时: ~120 秒\n")
 
     try:
-        bot = MC602.connect()
+        robot = Robot.connect()
+        motors = {p: robot.motor(p) for p in range(1, 7)}   # ← per-instance drivers
     except (SerialNotFoundError, ConnectionError) as e:
         print(f"[!] {e}")
         return 1
 
     with bot:
-        print(f"[OK] 连接 {bot._port_name}, FW={bot.system.version}, "
+        print(f"[OK] 连接 {robot.bot._port_name}, FW={robot.bot.system.version}, "
               f"V={bot.system.voltage:.2f}V\n")
 
         # ── 测试 1: 全速前进 ──

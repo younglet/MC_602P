@@ -90,20 +90,16 @@ class Robot:
     # ---- 生命周期 ----
 
     @classmethod
-    def connect(cls, port: Optional[str] = None, **kwargs) -> "Robot":
+    def connect(cls, port: Optional[str] = None,
+                auto_load: bool = True,
+                auto_flash: bool = True,
+                **kwargs) -> "Robot":
         """
-        创建并打开一个 Robot。
-        port=None 时自动找 CH340。
+        创建并打开一个 Robot (自动找 CH340 / 自动烧录 / 自动载入参数)。
+        用法: robot = Robot.connect() → robot.motor(1) / robot.servo485(1) ...
         """
-        if port is None:
-            port = find_ch340_port()
-            if port is None:
-                raise SerialNotFoundError(
-                    "找不到 CH340 串口 (VID=0x1A86)。"
-                    "请确认 MC602P 已通过 USB 连接, 且 CH340 驱动已安装。"
-                )
-        bot = MC602(port=port, **kwargs)
-        bot.open()
+        bot = MC602.connect(
+            port=port, auto_load=auto_load, auto_flash=auto_flash, **kwargs)
         return cls(bot)
 
     def __enter__(self) -> "Robot":

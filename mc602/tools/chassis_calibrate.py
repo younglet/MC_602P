@@ -22,7 +22,7 @@ import math
 grandparent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, grandparent_dir)
 
-from mc602 import MC602, MecanumChassis, SerialNotFoundError, ConnectionError
+from mc602 import Robot, MecanumChassis, SerialNotFoundError, ConnectionError
 
 R = 3.0      # 轮半径 cm (按实际改)
 PPR = 2048   # 编码器每圈脉冲 (按实际改)
@@ -34,13 +34,13 @@ def main() -> int:
     print("=" * 60)
 
     try:
-        bot = MC602.connect()
+        robot = Robot.connect()
     except (SerialNotFoundError, ConnectionError) as e:
         print(f"[!] {e}")
         return 1
 
     with bot:
-        print(f"[OK] {bot._port_name}, FW={bot.system.version}")
+        print(f"[OK] {robot.bot._port_name}, FW={robot.bot.system.version}")
         car = MecanumChassis(bot, track=30, wheel_base=28,
                              wheel_radius=R, encoder_ppr=PPR)
 
@@ -49,14 +49,14 @@ def main() -> int:
         car.abort()
         time.sleep(0.3)
         for p in range(1, 5):
-            bot.motor.reset_encoder(p)
+            motor.reset_encoder()
         for p in range(1, 5):
-            bot.motor.set_speed(p, 100)
+            motor.set_speed(100)
         time.sleep(2)
         for p in range(1, 5):
-            bot.motor.stop(p)
+            motor.stop()
         time.sleep(0.2)
-        e = [bot.motor.get_encoder(p) for p in range(1, 5)]
+        e = [motors[p-1].encoder for p in range(1, 5)]
         dists = [abs(x) * (2 * math.pi * R / PPR) for x in e]
         max_v = sum(dists) / 4 / 2.0
         print(f"    各轮: {[round(d, 1) for d in dists]} cm")

@@ -15,7 +15,7 @@ import time
 grandparent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, grandparent_dir)
 
-from mc602 import MC602, M1, SerialNotFoundError, ConnectionError
+from mc602 import Robot, M1, SerialNotFoundError, ConnectionError
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else M1   # 电机端口
 SPEED = 60          # 测试速度
@@ -29,30 +29,30 @@ def main() -> int:
     print("=" * 55)
 
     try:
-        bot = MC602.connect()
+        robot = Robot.connect()
     except (SerialNotFoundError, ConnectionError) as e:
         print(f"[!] {e}")
         return 1
 
     with bot:
-        print(f"[OK] {bot._port_name}, FW={bot.system.version}")
+        print(f"[OK] {robot.bot._port_name}, FW={robot.bot.system.version}")
 
-        bot.motor.reset_encoder(PORT)
+        m = robot.motor(PORT); m.reset_encoder()
         time.sleep(0.1)
-        enc0 = bot.motor.get_encoder(PORT)
+        enc0 = m.encoder
 
         print(f"[   ] 正转 +{SPEED} ({DURATION}s) ...")
-        bot.motor.set_speed(PORT, SPEED)
+        m.set_speed(SPEED)
         time.sleep(DURATION)
-        enc_fwd = bot.motor.get_encoder(PORT)
-        bot.motor.stop(PORT)
+        enc_fwd = m.encoder
+        m.stop()
         time.sleep(0.3)
 
         print(f"[   ] 反转 -{SPEED} ({DURATION}s) ...")
-        bot.motor.set_speed(PORT, -SPEED)
+        m.set_speed(-SPEED)
         time.sleep(DURATION)
-        enc_rev = bot.motor.get_encoder(PORT)
-        bot.motor.stop(PORT)
+        enc_rev = m.encoder
+        m.stop()
         time.sleep(0.3)
 
         fwd = enc_fwd - enc0

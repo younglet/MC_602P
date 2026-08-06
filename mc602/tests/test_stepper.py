@@ -35,32 +35,33 @@ def main() -> int:
     print("=" * 55)
 
     try:
-        bot = MC602.connect()
+        robot = Robot.connect()
     except (SerialNotFoundError, ConnectionError) as e:
         print(f"[!] {e}")
         return 1
 
     with bot:
-        print(f"[OK] {bot._port_name}, FW={bot.system.version}")
+        print(f"[OK] {robot.bot._port_name}, FW={robot.bot.system.version}")
+        st = robot.stepper(CH)           # ← per-instance driver
 
         print(f"[   ] 设 acc={ACC} ...")
-        bot.stepper.set_acc(CH, ACC)
+        st.set_acc(CH, ACC)
         time.sleep(0.1)
 
-        d0 = bot.stepper.get_distance(CH)   # 起点绝对位置
+        d0 = st.distance(CH)   # 起点绝对位置
 
         print(f"[   ] 正转 +{SPEED} ({DURATION}s) ...")
-        bot.stepper.set_speed(CH, SPEED)
+        st.set_speed(CH, SPEED)
         time.sleep(DURATION)
-        d_fwd = bot.stepper.get_distance(CH)
-        bot.stepper.stop(CH)
+        d_fwd = st.distance(CH)
+        st.stop(CH)
         time.sleep(0.3)
 
         print(f"[   ] 反转 -{SPEED} ({DURATION}s) ...")
-        bot.stepper.set_speed(CH, -SPEED)
+        st.set_speed(CH, -SPEED)
         time.sleep(DURATION)
-        d_rev = bot.stepper.get_distance(CH)
-        bot.stepper.stop(CH)
+        d_rev = st.distance(CH)
+        st.stop(CH)
         time.sleep(0.3)
 
         # 注意: distance 是驱动器累计的绝对位置 (非阶段增量), 必须做差
@@ -71,7 +72,7 @@ def main() -> int:
         print(f"[{'PASS' if ok else 'FAIL'}] {'方向正确' if ok else '方向异常/无脉冲!'}")
 
         print("[   ] 复位/释放 (阻塞 ~100ms) ...")
-        bot.stepper.reset(CH)
+        st.reset(CH)
 
         return 0 if ok else 1
 

@@ -23,9 +23,9 @@ def sample_run(bot, port, target, duration, dt):
     """运行 target 速度 duration 秒, 返回 [(t, encoder, speed_pps), ...]
     容忍偶发超时 (固件偶发响应慢): 超时用 None 占位, 不中断采样.
     """
-    bot.motor.reset_encoder(port)
+    motors[port].reset_encoder()
     time.sleep(INTER_CALL)  # 让 reset 生效
-    bot.motor.set_speed(port, target)
+    motors[port].set_speed(target)
     time.sleep(POST_SETTLE)  # 等 PID 模式切换稳定 (避免 next sample 测到过渡态)
     rows = []
     t0 = time.monotonic()
@@ -41,7 +41,7 @@ def sample_run(bot, port, target, duration, dt):
             continue
         time.sleep(INTER_CALL)  # 避开固件竞态
         try:
-            enc = bot.motor.get_encoder(port)
+            enc = motors[port].encoder
         except Exception as ex:
             n_timeouts += 1
             t = time.monotonic() - t0
@@ -55,7 +55,7 @@ def sample_run(bot, port, target, duration, dt):
         rows.append((t, enc, speed))
         last_enc = enc
         next_t += dt
-    bot.motor.stop(port)
+    motors[port].stop()
     if n_timeouts > 0:
         print(f"  (警告: 采样中遇到 {n_timeouts} 次超时, 已用 0 速度填充)")
     return rows
@@ -134,15 +134,16 @@ def main():
     print(f"采样: {SAMPLE_DT*1000:.0f}ms / 持续 {DURATION}s / 稳态带 ±{SETTLE_PCT*100:.0f}%")
     print()
     try:
-        bot = MC602.connect()
+        robot = Robot.connect()
+        motors = {p: robot.motor(p) for p in range(1, 7)}   # ← per-instance drivers
     except (SerialNotFoundError, ConnectionError) as e:
         print(f"[!] {e}")
         return 1
     with bot:
-        print(f"[OK] 连接 {bot._port_name}")
+        print(f"[OK] 连接 {robot.bot._port_name}")
         try:
             print(f"[OK] 服务: {[hex(s) for s in bot.discover()]}")
-            print(f"[OK] 固件: {bot.system.version}  电压: {bot.system.voltage:.2f}V")
+            print(f"[OK] 固件: {robot.bot.system.version}  电压: {bot.system.voltage:.2f}V")
         except Exception as e:
             print(f"[!] 握手失败: {e}")
             return 2
