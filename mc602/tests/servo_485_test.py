@@ -1,11 +1,11 @@
 """
-servo_test.py — 485 总线舵机实机测试
+servo_485_test.py — 485 总线舵机实机测试
 
 舵机接在 485 总线 (与步进同链)。默认 S1, 可传参指定 ID。
 
 用法:
-    python mc602/tests/servo_test.py            # 485 S1
-    python mc602/tests/servo_test.py 3          # 485 S3
+    python mc602/tests/servo_485_test.py            # 485 S1
+    python mc602/tests/servo_485_test.py 3          # 485 S3
 """
 
 import sys
