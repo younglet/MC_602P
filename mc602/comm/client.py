@@ -433,23 +433,35 @@ def _auto_flash(port: str, slot: str = "a", bin_path: Optional[str] = None) -> N
     spec.loader.exec_module(pd)
 
     addr = slot_info["addr"]
-    print(f"[auto_flash] 固件无响应, 自动烧录 {bin_path} → 槽位 {slot} ({slot_info['name']} @0x{addr:08X}) ...")
-    if not pd.ReadBin(str(bin_path)):
-        raise ConnectionError(f"自动烧录失败: 读取固件失败 {bin_path}")
-    ctype = 0
-    for attempt in range(3):
-        ctype = pd.PingControl(port)
-        if ctype > 0:
-            break
-        time.sleep(1.0)
-    if ctype <= 0:
-        raise ConnectionError(f"自动烧录失败: PING {port} 无响应 (检查 USB)")
-    if not pd.Download(port, addr):
-        raise ConnectionError("自动烧录失败: Download 错误")
-    if addr == 0x0800D000:
-        pd.SaveNameToStm32(port, "RunA")
-    pd.RunCode(port, addr)
-    print(f"[auto_flash] 烧录完成, 槽位 {slot} 已运行")
+    # 静默烧录: 抑制 pydownload 的逐块下载日志, 避免混入程序交互文字
+    import contextlib
+    import io as _io
+    buf = _io.StringIO()
+    ok = False
+    try:
+        with contextlib.redirect_stdout(buf):
+            if not pd.ReadBin(str(bin_path)):
+                raise ConnectionError(f"自动烧录失败: 读取固件失败 {bin_path}")
+            ctype = 0
+            for attempt in range(3):
+                ctype = pd.PingControl(port)
+                if ctype > 0:
+                    break
+                time.sleep(1.0)
+            if ctype <= 0:
+                raise ConnectionError(f"自动烧录失败: PING {port} 无响应 (检查 USB)")
+            if not pd.Download(port, addr):
+                raise ConnectionError("自动烧录失败: Download 错误")
+            if addr == 0x0800D000:
+                pd.SaveNameToStm32(port, "RunA")
+            pd.RunCode(port, addr)
+        ok = True
+    finally:
+        if not ok:
+            # 失败时输出完整日志帮助排查
+            sys.stderr.write(buf.getvalue())
+    if ok:
+        print(f"[auto_flash] 固件无响应 → 已自动烧录 {slot} 槽 ({slot_info['name']}) 并重启")
 
 
 
