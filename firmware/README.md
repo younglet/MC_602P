@@ -100,7 +100,7 @@ C:\Users\young\Desktop\whalesbot\new_whalesbot\AI_Module_GCC\arm_gcc_10\bin\
 ### 4.1 编译
 
 ```bash
-cd C:/Users/young/Documents/projects/MC_602P/firmware
+cd C:/Users/young/Documents/projects/mc602p-firmware/firmware
 python tools/build_firmware.py           # 只编译
 python tools/build_firmware.py --deploy  # 编译 + 部署到 mc602sdk/Run.bin
 python tools/build_firmware.py --clean   # 清理后重新编译
@@ -343,12 +343,12 @@ printf("hello");  // ❌ 出现在 LCD，不是终端！
 
 ```bash
 # 编译
-cd C:/Users/young/Documents/projects/MC_602P/firmware
+cd C:/Users/young/Documents/projects/mc602p-firmware/firmware
 python tools/build_firmware.py
 
 # 烧录 + 运行
-cp build/Run.bin ~/Desktop/whalesbot/new_whalesbot/AI_Module_GCC/MC_602P/AT32Gcc/Debug/
-cd ~/Desktop/whalesbot/new_whalesbot/AI_Module_GCC/MC_602P
+cp build/Run.bin ~/Desktop/whalesbot/new_whalesbot/AI_Module_GCC/mc602p-firmware/AT32Gcc/Debug/
+cd ~/Desktop/whalesbot/new_whalesbot/AI_Module_GCC/mc602p-firmware
 python pybuilder/pydownload.py -file "AT32Gcc/Debug/Run.bin" -address 0x800D000
 ```
 

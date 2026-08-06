@@ -17,7 +17,7 @@ MC902P
 MC602P
 '''
 #CPDIR = "MC_902P\\"
-CPDIR = "MC_602P\\"
+CPDIR = "mc602p-firmware\\"
 
 
 

@@ -48,7 +48,7 @@ PING 的**唯一作用**：让当前固件检测到 → 跳到 BootLoader，让 
 
 ```bash
 # GUI 启动后, 烧到 0x0800D000 并立即跳转
-cd C:/Users/young/Desktop/whalesbot/new_whalesbot/AI_Module_GCC/MC_602P
+cd C:/Users/young/Desktop/whalesbot/new_whalesbot/AI_Module_GCC/mc602p-firmware
 python pybuilder/pydownload.py -file "AT32Gcc/Debug/Run.bin" -address 0x800D000
 ```
 
@@ -95,22 +95,22 @@ with MC602.connect() as bot:
 
 ```bash
 # 1. 编译
-cd C:/Users/young/Documents/projects/MC_602P
+cd C:/Users/young/Documents/projects/mc602p-firmware
 python smart_car_sdk/tools/build_firmware.py
 
 # 2. 复制到 pydownload.py 能找到的位置
 cp smart_car_sdk/build/Run.bin \
-   C:/Users/young/Desktop/whalesbot/new_whalesbot/AI_Module_GCC/MC_602P/AT32Gcc/Debug/Run.bin
+   C:/Users/young/Desktop/whalesbot/new_whalesbot/AI_Module_GCC/mc602p-firmware/AT32Gcc/Debug/Run.bin
 
 # 3. 烧录 (pydownload.py 的 PING 会自动让旧固件退出)
-cd C:/Users/young/Desktop/whalesbot/new_whalesbot/AI_Module_GCC/MC_602P
+cd C:/Users/young/Desktop/whalesbot/new_whalesbot/AI_Module_GCC/mc602p-firmware
 python pybuilder/pydownload.py -file "AT32Gcc/Debug/Run.bin" -address 0x800D000
 
 # 4. 等 3 秒让固件启动完
 sleep 3
 
 # 5. 验证
-cd C:/Users/young/Documents/projects/MC_602P
+cd C:/Users/young/Documents/projects/mc602p-firmware
 python -c "
 from mc602 import MC602
 with MC602.connect() as bot:

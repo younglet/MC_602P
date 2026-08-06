@@ -97,7 +97,7 @@ void user_main(void)
 
     /* 2. LCD 头部 */
     LCD_ClearBuffer();
-    show(1, "MC602P smartcar");
+    show(1, "MC602P FW v1.0");
     show(2, "------------------");
     show(3, "V:0.00V bat:0%");
     show(4, "beat:o 0");

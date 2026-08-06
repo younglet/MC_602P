@@ -1,4 +1,4 @@
-# MC_602P 架构规范
+# mc602p-firmware 架构规范
 
 > 6 层分层架构：Python SDK (OOP) → Transport → Packet → Dispatcher → DeviceManager → Device
 >
@@ -374,4 +374,4 @@ static uint8_t servo_handler(...) {
 
 **最后更新**: 2026-07-03
 **架构版本**: 6-Layer (v1.0)
-**作者**: MC_602P 架构组
+**作者**: mc602p-firmware 架构组

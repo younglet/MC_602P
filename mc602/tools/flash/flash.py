@@ -31,7 +31,7 @@ from pathlib import Path
 
 HERE         = Path(__file__).resolve().parent   # mc602/tools/flash/
 PKG_ROOT     = HERE.parent                      # mc602/tools/
-WORKSPACE    = PKG_ROOT.parent                  # MC_602P/
+WORKSPACE    = PKG_ROOT.parent                  # mc602p-firmware/
 DEFAULT_BIN  = HERE / "Run.bin"
 PYDOWNLOAD   = HERE / "pydownload.py"
 BUILD_SCRIPT = WORKSPACE / "firmware" / "tools" / "build_firmware.py"

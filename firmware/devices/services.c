@@ -82,7 +82,7 @@ static uint8_t system_handler(uint8_t op, uint8_t inst, uint8_t prop,
             return STATUS_OK;
         }
         case 0x02: { /* version (str) */
-            const char *ver = "MC602P v1.1";
+            const char *ver = "MC602P FW v1.0";
             uint8_t slen = (uint8_t)strlen(ver);
             out_data[0] = slen;
             memcpy(out_data + 1, ver, slen);
@@ -1121,7 +1121,7 @@ int lcd_service_poll(void)
 
     if (lcd_cmd_type == 4) {
         /* 恢复心跳模式: 重画标题/分隔线 (3/4/5 行由 render_lcd 自动更新) */
-        show(1, "%s", "MC602P smartcar");
+        show(1, "%s", "MC602P FW v1.0");
         show(2, "%s", "------------------");
         LCD_Ram2LCD();
         return 1;

@@ -1,9 +1,9 @@
-# MC_602P — 鲸鱼机器人 GCC 用户固件
+# mc602p-firmware — 鲸鱼机器人 GCC 用户固件
 
 > 3 层清晰目录：项目根 → 分类 → 源码
 
 ```
-MC_602P/
+mc602p-firmware/
 ├── docs/          # 参考文档（架构 / 烧录 / API / 硬件）
 ├── firmware/      # 下位机 C 固件 (STM32 / AT32F403, FreeRTOS)
 ├── host/          # 上位机 Python SDK + 评测脚本

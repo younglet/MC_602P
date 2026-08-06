@@ -38,7 +38,7 @@ except Exception:
 TOOLS_DIR = Path(__file__).resolve().parent                  # smart_car_sdk/tools/
 SDK_DIR   = TOOLS_DIR.parent                                 # smart_car_sdk/
 
-WORKSPACE_DIR = SDK_DIR.parent                                # Documents/projects/MC_602P/
+WORKSPACE_DIR = SDK_DIR.parent                                # Documents/projects/mc602p-firmware/
 AT32GCC_DIR   = WORKSPACE_DIR / "AT32Gcc"                     # 现成 SDK
 DEVICE_DIR    = SDK_DIR                                        # 我们的 C 源码 (firmware/ 本身就是源码根)
 BUILD_DIR     = SDK_DIR / "build"                             # 编译输出
