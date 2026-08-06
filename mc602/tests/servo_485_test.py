@@ -42,7 +42,23 @@ def main() -> int:
         print(f"[   ] 在线检测: {bot.servo_bus.ping(SID)}")
         print(f"[   ] 固件版本: {bot.servo_bus.read_version(SID)}")
 
-        print("[PASS] 485 舵机指令全部发送成功 (请目视确认转动)")
+        # ---- 可选: 修改 ID (回车跳过, 新 ID 限 1~3) ----
+        try:
+            ans = input(f"  修改 ID → 1~3 (回车跳过, 当前 S{SID}): ").strip()
+            if ans:
+                new_id = int(ans)
+                if 1 <= new_id <= 3 and new_id != SID:
+                    print(f"  ⚠️ 要求总线上只有 1 个舵机")
+                    bot.servo_bus.change_id(SID, new_id)
+                    print(f"  S{SID} → S{new_id} 修改完成")
+                else:
+                    print("  跳过: ID 必须 1~3 且不同于当前")
+            else:
+                print("  跳过 (保持 S{})".format(SID))
+        except ValueError:
+            print("  跳过: 无效输入")
+
+        print("[PASS] 485 舵机测试完成 (请目视确认转动)")
         return 0
 
 
