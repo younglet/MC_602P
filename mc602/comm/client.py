@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import threading
 import time
+import sys
 from typing import Dict, List, Optional
 
 import serial  # type: ignore
@@ -57,6 +58,9 @@ CH340_PID_ALT      = 0x5523
 DEFAULT_BAUDRATE   = 1_000_000
 DEFAULT_TIMEOUT    = 3.0
 DEFAULT_RW_TIMEOUT = 3.0
+
+# auto_flash 烧完 RunCode 后, 等固件 boot 完成再验证的时间 (时间给足)
+AUTO_FLASH_BOOT_WAIT_S = 3.0
 
 
 # =========================================================================
@@ -151,6 +155,10 @@ class MC602:
             if auto_flash:
                 bot.close()
                 _auto_flash(port, slot="A")
+                # 烧完 RunCode 后固件正在重启, 必须等它 boot 完才能响应.
+                # 时间给足: 立刻 verify 只会全部打在 boot 窗口外 ("启动时间不够").
+                print(f"[connect] 已重烧, 等 {AUTO_FLASH_BOOT_WAIT_S:.0f}s 让固件 boot ...")
+                time.sleep(AUTO_FLASH_BOOT_WAIT_S)
                 bot = cls(port=port, baudrate=baudrate, timeout=timeout)
                 bot.open()
                 bot._verify_firmware()
@@ -431,6 +439,9 @@ def _auto_flash(port: str, slot: str = "a", bin_path: Optional[str] = None) -> N
         "pydownload", flash_dir / "pydownload.py")
     pd = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(pd)
+    # 禁用 resume: 控制器 CRC 响应是回显而非真实 flash CRC (假匹配),
+    # 依赖它跳过会导致 4k 起从未真写 (固件残缺, 连不上). 全量真写约 6s.
+    pd.CrcFlash = lambda ser, addr, crc: False
 
     addr = slot_info["addr"]
     # 静默烧录: 抑制 pydownload 的逐块下载日志, 避免混入程序交互文字

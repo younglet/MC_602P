@@ -27,6 +27,16 @@ python mc602/tools/flash/flash.py --rebuild
 `--deploy` 拷贝 `Run.bin` 到 `mc602/tools/flash/`，`flash.py` 烧录它。
 PING 慢帧会自动触发旧固件复位，**不需要手动按按钮**。
 
+烧录前 `flash.py` 会自动走**启动阶梯**（解决"还在 download 就自动跳出"）：
+
+1. **先 PING** 探测 — 通就直接下载
+2. PING 不通 → **RunCode 启动 RunA 槽程序**（让用户程序跑起来，UART 中断里的 PING 检测才武装）
+3. 等 4s 让固件 boot 完成（时间给足）
+4. **再 PING**
+5. 再不行才**直接下载**（协议层自带 5 次重试）
+
+下载阶段协议等待已放宽（控制器写 flash / 回包慢时不会提前超时）。跳过阶梯用 `flash.py --direct`。
+
 ### 3. 跑上位机评测
 ```bash
 # 自动化测试与设备评测 (单元测试无需硬件, *_test 实机)

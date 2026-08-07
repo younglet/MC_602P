@@ -75,6 +75,10 @@ bot.system.reboot()  # 跳到 BootLoader 0x08000000
 
 **这是默认行为 — 用户完全不用按按钮。**
 
+**启动阶梯**（`flash.py` 已内置，见 §6 常见坑）：PING 不通时会先
+`RunCode` 启动 RunA 槽程序 → 等 4s boot → 再 PING → 再不行才下载。
+每次 PING 间隔 1s，下载阶段协议等待也放宽，避免"还在 download 就自动跳出"。
+
 ### 3.5 检查 slot1 是否在跑 + 是否是预期的版本
 
 ```python
@@ -164,6 +168,8 @@ python smart_car_sdk/examples/m1_pid_eval.py
 | `SerialNotFoundError` | CH340 驱动没装 / USB 没插 | 装驱动 / 换口（不用动固件） |
 | `TimeoutError: DISCOVER 超时` | 固件没起来 / 不是我们的协议固件 | 重烧 + 等 3s |
 | `pydownload.py: ---Fail: No Control` 5 次 | PING 触发后固件退出，但还没轮回到下一 PING | 多跑几次 `pydownload.py`，或先 `bot.system.bootloader()` 再烧 |
+| **还在 download 就自动跳出** | 握手后控制器没进入稳定下载态（写 flash 超时 / 启动时序不稳） | `flash.py` 已内置启动阶梯: PING → 启动 RunA → 等 4s → 再 PING → 强烧，且下载等待放宽；想用老流程加 `--direct` |
+| **烧录 1~2 秒"秒完"但烧完连不上** | 控制器 CRC 响应是**回显**（假匹配）→ 所有块 `Crc Same,Resume` 跳过 → 只有 0k 块真写, 固件残缺 | `flash.py`/`_auto_flash` 已禁用 resume 强制全量真写 (~6s)；另注意 `mc602/tools/flash/Run.bin` 必须是最新 `build_firmware.py --deploy` 的产物 |
 | 烧完再连不上 | 固件 hang 住 (motor/SDK 死锁) | **`bot.system.reboot()`** — 不需要手动复位 |
 | 想测多个版本 | RunA~F 是 6 个槽 | `pydownload.py -address 0x8060000` (RunA) 等 |
 | **跑 1~2 个测试就卡死** | 心跳 callback 写 UART → 与协议响应帧抢同一 TX buffer → 响应截断, PC 端 CRC 错 | **心跳 callback 不能写 UART**. 系统状态 PC 端通过 `bot.system.*` 主动 poll (不需要主动推送) |
